@@ -66,7 +66,7 @@ loader.load('ModeloGLB.glb', (gltf) => {
 
 // ================= PALETA DE 200 COLORES GRADUAL ================= 
 const colors = ['#000000','#888888','#ffffff']; 
-const totalColors = 197; 
+const totalColors = 97; 
 for(let i=0;i<totalColors;i++){ 
   const hue = (i/totalColors)*360; 
   const saturation = 80; 
@@ -110,6 +110,38 @@ colors.forEach(color=>{
   btn.addEventListener('click',()=>{ currentColor=color; }); 
   paletteDiv.appendChild(btn); 
 }); 
+
+// ================= BOTÓN DESACTIVAR PINTAR =================
+let paintEnabled = true; // variable global que controla si se puede pintar
+
+const disablePaintBtn = document.createElement('div');
+disablePaintBtn.style.gridColumn = 'span 4'; // ocupa 4 columnas
+disablePaintBtn.style.height = '25px';
+disablePaintBtn.style.background = '#ffffff';
+disablePaintBtn.style.position = 'relative';
+disablePaintBtn.style.cursor = 'pointer';
+disablePaintBtn.title = "Desactivar Pintar";
+
+// línea diagonal roja
+const line = document.createElement('div');
+line.style.position = 'absolute';
+line.style.width = '2px';
+line.style.height = '100%';
+line.style.background = 'red';
+line.style.transform = 'rotate(45deg)';
+line.style.top = '0';
+line.style.left = '50%';
+line.style.transformOrigin = 'center';
+disablePaintBtn.appendChild(line);
+
+// click alterna pintar/desactivar
+disablePaintBtn.addEventListener('click', () => {
+  paintEnabled = !paintEnabled;
+  disablePaintBtn.style.opacity = paintEnabled ? '0.6' : '1';
+});
+
+// insertar el botón arriba de la paleta
+paletteDiv.insertBefore(disablePaintBtn, paletteDiv.firstChild);
 
 // ================= SLIDER PUNTERO ================= 
 const brushSlider = document.createElement('input'); 
@@ -225,6 +257,7 @@ renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
 renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
 
 function onMouseMove(event){
+  if (isDrawing && paintEnabled) {
   if(!glbModel) return;
 
   mouse.x = (event.clientX / window.innerWidth)*2-1;
@@ -274,13 +307,16 @@ function onMouseMove(event){
     }
     hoveredObject = null;
   }
+  }
 }
 
 function onMouseDown(event){
+  if (isDrawing && paintEnabled) {
   if(event.button===0){
     isDrawing=true;
     onMouseMove(event);
     if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555);
+  }
   }
 }
 
@@ -329,6 +365,7 @@ renderer.domElement.addEventListener('touchend', (event) => {
 
 // ================= FUNCION HOVER PARA TACTIL =================
 function onTouchHover(touchVec2) {
+  if (isDrawing && paintEnabled) {
   raycaster.setFromCamera(touchVec2, camera);
   const intersects = raycaster.intersectObjects(glbModel.children, true);
 
@@ -351,6 +388,7 @@ function onTouchHover(touchVec2) {
       }
     });
   }
+  }
 }
 
 // ================= ANIMACIÓN ================= 
@@ -367,6 +405,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
