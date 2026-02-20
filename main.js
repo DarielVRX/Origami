@@ -195,26 +195,25 @@ exportImgBtn.addEventListener('click',()=>{
   },500); 
 }); 
 
-// ================= BLOQUEO DE CAMARA =================
-let cameraLocked = false;
-const cameraLockBtn = document.createElement('button');
-cameraLockBtn.textContent = "Bloquear Cámara";
-cameraLockBtn.style.position='fixed';
-cameraLockBtn.style.bottom='100px';
-cameraLockBtn.style.left='10px';
-cameraLockBtn.style.padding='10px';
-cameraLockBtn.style.fontSize='1em';
-cameraLockBtn.style.cursor='pointer';
-cameraLockBtn.style.zIndex=1000;
-document.body.appendChild(cameraLockBtn);
+// ================= BLOQUEO DE CAMARA Y PINTAR =================
+let cameraLocked = false; 
+const cameraLockBtn = document.createElement('button'); 
+cameraLockBtn.textContent = "Bloquear Cámara"; 
+cameraLockBtn.style.position='fixed'; 
+cameraLockBtn.style.bottom='100px'; 
+cameraLockBtn.style.left='10px'; 
+cameraLockBtn.style.padding='10px'; 
+cameraLockBtn.style.fontSize='1em'; 
+cameraLockBtn.style.cursor='pointer'; 
+cameraLockBtn.style.zIndex=1000; 
+document.body.appendChild(cameraLockBtn); 
 
-cameraLockBtn.addEventListener('click', () => {
-  cameraLocked = !cameraLocked;
-
-  // Solo deshabilitar rotación y pan, pero mantener zoom y updates para raycaster
-  controls.enableRotate = !cameraLocked;
-  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara";
-});
+cameraLockBtn.addEventListener('click', () => { 
+  cameraLocked = !cameraLocked; 
+  controls.enableRotate = !cameraLocked; 
+  paintEnabled = cameraLocked; // Pintar solo si cámara bloqueada
+  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara (Pintar habilitado)" : "Bloquear Cámara (Pintar deshabilitado)"; 
+}); 
 
 // ================= INTERACCIONES ================= 
 const maxDistance = 70;
@@ -367,6 +366,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
