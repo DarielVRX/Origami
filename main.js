@@ -200,7 +200,7 @@ let cameraLocked = false;
 const cameraLockBtn = document.createElement('button');
 cameraLockBtn.textContent = "Bloquear Cámara";
 cameraLockBtn.style.position='fixed';
-cameraLockBtn.style.bottom='50px';
+cameraLockBtn.style.bottom='100px';
 cameraLockBtn.style.left='10px';
 cameraLockBtn.style.padding='10px';
 cameraLockBtn.style.fontSize='1em';
@@ -208,9 +208,13 @@ cameraLockBtn.style.cursor='pointer';
 cameraLockBtn.style.zIndex=1000;
 document.body.appendChild(cameraLockBtn);
 
-cameraLockBtn.addEventListener('click',()=>{
+cameraLockBtn.addEventListener('click', () => {
   cameraLocked = !cameraLocked;
-  controls.enabled = !cameraLocked;
+
+  // Solo deshabilitar rotación y pan, pero mantener zoom y updates para raycaster
+  controls.enableRotate = !cameraLocked;   // Bloquea rotación con un dedo
+  controls.enablePan = false;              // Siempre bloqueamos pan
+  controls.enableZoom = true;              // Mantener zoom con pellizco
   cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara";
 });
 
@@ -296,4 +300,5 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
