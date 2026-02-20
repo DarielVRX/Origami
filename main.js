@@ -111,16 +111,15 @@ colors.forEach(color=>{
   btn.title=color; 
   btn.addEventListener('click', () => { 
     currentColor = color; 
-    paintEnabled = true;  // activa el pintar al elegir un color
+    paintEnabled = true; // activa el pintar al elegir un color
     disablePaintBtn.style.opacity = '1'; // opcional: refleja estado activo
-});
+  }); 
   paletteDiv.appendChild(btn); 
 }); 
 
 // ================= BOTÓN DESACTIVAR PINTAR =================
-
 const disablePaintBtn = document.createElement('div');
-disablePaintBtn.style.gridColumn = 'span 2'; // ocupa 4 columnas
+disablePaintBtn.style.gridColumn = 'span 2'; 
 disablePaintBtn.style.gridRow = 'span 2';
 disablePaintBtn.style.height = '25px';
 disablePaintBtn.style.background = '#ffffff';
@@ -157,8 +156,8 @@ brushSlider.max='10';
 brushSlider.value=brushSize; 
 brushSlider.style.position='fixed'; 
 brushSlider.style.top='20px'; 
-brushSlider.style.left='50%';
-brushSlider.style.transform = 'translateX(-50%)';
+brushSlider.style.left='50%'; 
+brushSlider.style.transform = 'translateX(-50%)'; 
 brushSlider.style.zIndex=1000; 
 brushSlider.style.width='1000px'; 
 document.body.appendChild(brushSlider); 
@@ -234,167 +233,149 @@ exportImgBtn.addEventListener('click',()=>{
 }); 
 
 // ================= BLOQUEO DE CAMARA =================
-let cameraLocked = false;
-const cameraLockBtn = document.createElement('button');
-cameraLockBtn.textContent = "Bloquear Cámara";
-cameraLockBtn.style.position='fixed';
-cameraLockBtn.style.bottom='100px';
-cameraLockBtn.style.left='10px';
-cameraLockBtn.style.padding='10px';
-cameraLockBtn.style.fontSize='1em';
-cameraLockBtn.style.cursor='pointer';
-cameraLockBtn.style.zIndex=1000;
-document.body.appendChild(cameraLockBtn);
+let cameraLocked = false; 
+const cameraLockBtn = document.createElement('button'); 
+cameraLockBtn.textContent = "Bloquear Cámara"; 
+cameraLockBtn.style.position='fixed'; 
+cameraLockBtn.style.bottom='100px'; 
+cameraLockBtn.style.left='10px'; 
+cameraLockBtn.style.padding='10px'; 
+cameraLockBtn.style.fontSize='1em'; 
+cameraLockBtn.style.cursor='pointer'; 
+cameraLockBtn.style.zIndex=1000; 
+document.body.appendChild(cameraLockBtn); 
 
-cameraLockBtn.addEventListener('click', () => {
-  cameraLocked = !cameraLocked;
-
+cameraLockBtn.addEventListener('click', () => { 
+  cameraLocked = !cameraLocked; 
   // Solo deshabilitar rotación y pan, pero mantener zoom y updates para raycaster
-  controls.enableRotate = !cameraLocked;
-  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara";
-});
+  controls.enableRotate = !cameraLocked; 
+  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara"; 
+}); 
 
 // ================= INTERACCIONES ================= 
-const maxDistance = 90;
+const maxDistance = 90; 
+renderer.domElement.addEventListener('mousemove',onMouseMove); 
+renderer.domElement.addEventListener('mousedown',onMouseDown); 
+renderer.domElement.addEventListener('mouseup',()=>isDrawing=false); 
+renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault()); 
 
-renderer.domElement.addEventListener('mousemove',onMouseMove);
-renderer.domElement.addEventListener('mousedown',onMouseDown);
-renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
-renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
+function onMouseMove(event){ 
+  if (isDrawing && paintEnabled) { 
+    if(!glbModel) return; 
+    mouse.x = (event.clientX / window.innerWidth)*2-1; 
+    mouse.y = -(event.clientY / window.innerHeight)*2+1; 
+    brushCircle.style.left = event.clientX - brushCircle.offsetWidth/2 + 'px'; 
+    brushCircle.style.top = event.clientY - brushCircle.offsetHeight/2 + 'px'; 
+    raycaster.setFromCamera(mouse,camera); 
+    const intersects = raycaster.intersectObjects(glbModel.children,true); 
+    if(intersects.length > 0 && intersects[0].distance <= maxDistance){ 
+      const hitPoint = intersects[0].point; 
+      const obj = intersects[0].object; 
+      if(hoveredObject && hoveredObject !== obj && hoveredObject !== lastClickedObject){ 
+        hoveredObject.material.emissive.setHex(0x000000); 
+      } 
+      hoveredObject = obj; 
+      if(hoveredObject !== lastClickedObject){ 
+        hoveredObject.material.emissive.setHex(0x333333); 
+      } 
+      if(isDrawing){ 
+        glbModel.traverse(child=>{ 
+          if(child.isMesh){ 
+            child.geometry.computeBoundingSphere(); 
+            const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld); 
+            const dist = sphere.center.distanceTo(hitPoint); 
+            if(dist <= brushSize){ 
+              if(!child.userData.currentColor){ 
+                child.material = child.userData.originalMaterial.clone(); 
+              } 
+              child.material.color.set(currentColor); 
+              child.userData.currentColor = child.material.color.clone(); 
+              if(!selectedObjects.includes(child)) selectedObjects.push(child); 
+            } 
+          } 
+        }); 
+      } 
+    } else { 
+      if(hoveredObject && hoveredObject !== lastClickedObject){ 
+        hoveredObject.material.emissive.setHex(0x000000); 
+      } 
+      hoveredObject = null; 
+    } 
+  } 
+} 
 
-function onMouseMove(event){
-  if(!glbModel) return;
-
-  mouse.x = (event.clientX / window.innerWidth)*2-1;
-  mouse.y = -(event.clientY / window.innerHeight)*2+1;
-
-  brushCircle.style.left = event.clientX - brushCircle.offsetWidth/2 + 'px';
-  brushCircle.style.top = event.clientY - brushCircle.offsetHeight/2 + 'px';
-
-  raycaster.setFromCamera(mouse,camera);
-  const intersects = raycaster.intersectObjects(glbModel.children,true);
-
-  if(intersects.length > 0 && intersects[0].distance <= maxDistance){
-    const hitPoint = intersects[0].point;
-    const obj = intersects[0].object;
-
-    // Restaurar hover del anterior
-    if(hoveredObject && hoveredObject !== obj && hoveredObject !== lastClickedObject){
-      hoveredObject.material.emissive.setHex(0x000000);
-    }
-    hoveredObject = obj;
-
-    // Resaltar
-    if(hoveredObject !== lastClickedObject){
-      hoveredObject.material.emissive.setHex(0x333333);
-    }
-
-    // Solo pintar si está activo
-    if(isDrawing && paintEnabled){
-      glbModel.traverse(child=>{
-        if(child.isMesh){
-          child.geometry.computeBoundingSphere();
-          const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld);
-          const dist = sphere.center.distanceTo(hitPoint);
-          if(dist <= brushSize){
-            if(!child.userData.currentColor){
-              child.material = child.userData.originalMaterial.clone();
-            }
-            child.material.color.set(currentColor);
-            child.userData.currentColor = child.material.color.clone();
-            if(!selectedObjects.includes(child)) selectedObjects.push(child);
-          }
-        }
-      });
-    }
-
-  } else {
-    if(hoveredObject && hoveredObject !== lastClickedObject){
-      hoveredObject.material.emissive.setHex(0x000000);
-    }
-    hoveredObject = null;
-  }
-}
-
-function onMouseDown(event){
-  if (paintEnabled && event.button === 0) {
-    isDrawing = true;
-    onMouseMove(event); // para que pinte inmediatamente
-    if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555);
-  }
-}
-}
+function onMouseDown(event){ 
+  if (isDrawing && paintEnabled) { 
+    if(event.button===0){ 
+      isDrawing=true; 
+      onMouseMove(event); 
+      if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555); 
+    } 
+  } 
+} 
 
 // ================= INTERACCIONES TÁCTILES =================
-renderer.domElement.addEventListener('touchstart', (event) => {
-  if (!glbModel) return;
+renderer.domElement.addEventListener('touchstart', (event) => { 
+  if (!glbModel) return; 
+  if (event.touches.length === 1) { // Un dedo: dibujar 
+    isDrawing = true; 
+    // Actualizar posición del touch como mouse 
+    const touch = event.touches[0]; 
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1; 
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1; 
+    onTouchHover(mouse); 
+  } 
+  // Dos dedos: orbitar y zoom 
+  if (event.touches.length === 2) { 
+    // Activamos controles para zoom/pinch 
+    controls.enableRotate = !cameraLocked; 
+    controls.enableZoom = true; 
+  } 
+}, {passive: false}); 
 
-  if (event.touches.length === 1) {
-    // Un dedo: dibujar
-    isDrawing = true;
+renderer.domElement.addEventListener('touchmove', (event) => { 
+  if (!glbModel) return; 
+  if (event.touches.length === 1 && isDrawing) { 
+    const touch = event.touches[0]; 
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1; 
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1; 
+    onTouchHover(mouse); 
+    brushCircle.style.left = touch.clientX - brushCircle.offsetWidth / 2 + 'px'; 
+    brushCircle.style.top = touch.clientY - brushCircle.offsetHeight / 2 + 'px'; 
+  } 
+}, {passive: false}); 
 
-    // Actualizar posición del touch como mouse
-    const touch = event.touches[0];
-    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-
-    onTouchHover(mouse);
-  }
-  // Dos dedos: orbitar y zoom
-  if (event.touches.length === 2) {
-    // Activamos controles para zoom/pinch
-    controls.enableRotate = !cameraLocked;
-    controls.enableZoom = true;
-  }
-}, {passive: false});
-
-renderer.domElement.addEventListener('touchmove', (event) => {
-  if (!glbModel) return;
-  if (event.touches.length === 1 && isDrawing) {
-    const touch = event.touches[0];
-    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-
-    onTouchHover(mouse);
-
-    brushCircle.style.left = touch.clientX - brushCircle.offsetWidth / 2 + 'px';
-    brushCircle.style.top = touch.clientY - brushCircle.offsetHeight / 2 + 'px';
-  }
-}, {passive: false});
-
-renderer.domElement.addEventListener('touchend', (event) => {
-  if (event.touches.length === 0) {
-    isDrawing = false;
-  }
-}, {passive: false});
+renderer.domElement.addEventListener('touchend', (event) => { 
+  if (event.touches.length === 0) { 
+    isDrawing = false; 
+  } 
+}, {passive: false}); 
 
 // ================= FUNCION HOVER PARA TACTIL =================
-function onTouchHover(touchVec2) {
-  if (isDrawing && paintEnabled) {
-  raycaster.setFromCamera(touchVec2, camera);
-  const intersects = raycaster.intersectObjects(glbModel.children, true);
-
-  if (intersects.length > 0 && intersects[0].distance <= maxDistance) {
-    const hitPoint = intersects[0].point;
-
-    glbModel.traverse(child => {
-      if (child.isMesh) {
-        child.geometry.computeBoundingSphere();
-        const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld);
-        const dist = sphere.center.distanceTo(hitPoint);
-        if (dist <= brushSize) {
-          if (!child.userData.currentColor) {
-            child.material = child.userData.originalMaterial.clone();
-          }
-          child.material.color.set(currentColor);
-          child.userData.currentColor = child.material.color.clone();
-          if (!selectedObjects.includes(child)) selectedObjects.push(child);
-        }
-      }
-    });
-  }
-  }
-}
+function onTouchHover(touchVec2) { 
+  if (isDrawing && paintEnabled) { 
+    raycaster.setFromCamera(touchVec2, camera); 
+    const intersects = raycaster.intersectObjects(glbModel.children, true); 
+    if (intersects.length > 0 && intersects[0].distance <= maxDistance) { 
+      const hitPoint = intersects[0].point; 
+      glbModel.traverse(child => { 
+        if (child.isMesh) { 
+          child.geometry.computeBoundingSphere(); 
+          const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld); 
+          const dist = sphere.center.distanceTo(hitPoint); 
+          if (dist <= brushSize) { 
+            if (!child.userData.currentColor) { 
+              child.material = child.userData.originalMaterial.clone(); 
+            } 
+            child.material.color.set(currentColor); 
+            child.userData.currentColor = child.material.color.clone(); 
+            if (!selectedObjects.includes(child)) selectedObjects.push(child); 
+          } 
+        } 
+      }); 
+    } 
+  } 
+} 
 
 // ================= ANIMACIÓN ================= 
 function animate(){ 
@@ -405,16 +386,8 @@ function animate(){
 animate(); 
 
 // ================= AJUSTE VENTANA ================= 
-window.addEventListener('resize',()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth,window.innerHeight);
+window.addEventListener('resize',()=>{ 
+  camera.aspect = window.innerWidth/window.innerHeight; 
+  camera.updateProjectionMatrix(); 
+  renderer.setSize(window.innerWidth,window.innerHeight); 
 });
-
-
-
-
-
-
-
-
