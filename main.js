@@ -15,6 +15,12 @@ document.body.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = false;
 controls.mouseButtons = { LEFT: THREE.MOUSE.NONE, MIDDLE: THREE.MOUSE.ROTATE, RIGHT: THREE.MOUSE.NONE };
+controls.enablePan = false;        // deshabilitar pan
+controls.enableZoom = true;        // zoom habilitado
+controls.touches = {
+  ONE: THREE.TOUCH.ROTATE,          // 1 dedo: no orbita (usamos para pintar)
+  TWO: THREE.TOUCH.DOLLY_ROTATE     // 2 dedos: orbitar + pellizco para zoom
+};
 
 // ===================== LUCES =====================
 scene.add(new THREE.DirectionalLight(0xffffff,1).position.set(5,10,7.5));
@@ -46,7 +52,6 @@ let brushSize = 2;
 // ===================== CARGAR GLB AUTOMÁTICAMENTE =====================
 loader.load('ModeloGLB.glb', (gltf) => {
   if(glbModel) scene.remove(glbModel);
-
   glbModel = gltf.scene;
   glbModel.scale.set(0.5, 0.5, 0.5);
   glbModel.position.set(0, 0, 0);
@@ -60,19 +65,16 @@ loader.load('ModeloGLB.glb', (gltf) => {
   });
 
   scene.add(glbModel);
-
   const box = new THREE.Box3().setFromObject(glbModel);
   const center = box.getCenter(new THREE.Vector3());
   controls.target.copy(center);
   controls.update();
-
   console.log("¡GLB cargado automáticamente!");
 }, undefined, console.error);
 
 // ================= PALETA DE 200 COLORES GRADUAL =================
 const colors = ['#000000','#888888','#ffffff'];
 const totalColors = 197;
-
 for(let i=0;i<totalColors;i++){
   const hue = (i/totalColors)*360;
   const saturation = 80;
@@ -165,9 +167,9 @@ exportImgBtn.addEventListener('click',()=>{
 
   const positions = [
     new THREE.Vector3(0,22,70),
-                              new THREE.Vector3(0,22,-70),
-                              new THREE.Vector3(70,22,0),
-                              new THREE.Vector3(-70,22,0)
+    new THREE.Vector3(0,22,-70),
+    new THREE.Vector3(70,22,0),
+    new THREE.Vector3(-70,22,0)
   ];
 
   const size = 4096;
@@ -209,36 +211,63 @@ exportImgBtn.addEventListener('click',()=>{
 // ================= INTERACCIONES =================
 const maxDistance = 70;
 
+// MOUSE
 renderer.domElement.addEventListener('mousemove',onMouseMove);
 renderer.domElement.addEventListener('mousedown',onMouseDown);
 renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
 renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
+
+// TOUCH
+renderer.domElement.addEventListener('touchstart',onTouchStart,{passive:false});
+renderer.domElement.addEventListener('touchmove',onTouchMove,{passive:false});
+renderer.domElement.addEventListener('touchend',onTouchEnd,{passive:false});
+
+function onTouchStart(event){
+  if(event.touches.length===1){
+    isDrawing=true;
+    updateTouchPosition(event.touches[0]);
+    event.preventDefault();
+  }
+}
+function onTouchMove(event){
+  if(event.touches.length===1 && isDrawing){
+    updateTouchPosition(event.touches[0]);
+    event.preventDefault();
+  }
+}
+function onTouchEnd(event){
+  if(event.touches.length===0) isDrawing=false;
+}
+
+function updateTouchPosition(touch){
+  mouse.x = (touch.clientX / window.innerWidth)*2-1;
+  mouse.y = -(touch.clientY / window.innerHeight)*2+1;
+  brushCircle.style.left = touch.clientX - brushCircle.offsetWidth/2 + 'px';
+  brushCircle.style.top = touch.clientY - brushCircle.offsetHeight/2 + 'px';
+  onMouseMove({clientX: touch.clientX, clientY: touch.clientY});
+}
 
 function onMouseMove(event){
   if(!glbModel) return;
 
   mouse.x = (event.clientX / window.innerWidth)*2-1;
   mouse.y = -(event.clientY / window.innerHeight)*2+1;
-
   brushCircle.style.left = event.clientX - brushCircle.offsetWidth/2 + 'px';
   brushCircle.style.top = event.clientY - brushCircle.offsetHeight/2 + 'px';
 
   raycaster.setFromCamera(mouse,camera);
   const intersects = raycaster.intersectObjects(glbModel.children,true);
 
-  if(intersects.length > 0 && intersects[0].distance <= maxDistance){
+  if(intersects.length>0 && intersects[0].distance<=maxDistance){
     const hitPoint = intersects[0].point;
     const obj = intersects[0].object;
 
-    // Restaurar el material del objeto previamente hovered
-    if(hoveredObject && hoveredObject !== obj && hoveredObject !== lastClickedObject){
+    if(hoveredObject && hoveredObject!==obj && hoveredObject!==lastClickedObject){
       hoveredObject.material.emissive.setHex(0x000000);
     }
 
     hoveredObject = obj;
-
-    // Aplicar resalte solo en emissive
-    if(hoveredObject !== lastClickedObject){
+    if(hoveredObject!==lastClickedObject){
       hoveredObject.material.emissive.setHex(0x333333);
     }
 
@@ -247,29 +276,22 @@ function onMouseMove(event){
         if(child.isMesh){
           child.geometry.computeBoundingSphere();
           const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld);
-          const dist = sphere.center.distanceTo(hitPoint);
-          if(dist <= brushSize){
-            // Si ya tiene material pintado, usamos el mismo
+          if(sphere.center.distanceTo(hitPoint)<=brushSize){
             if(!child.userData.currentColor){
-              // Primera vez: clonar el material base
               child.material = child.userData.originalMaterial.clone();
             }
-            // Aplicar color actual
             child.material.color.set(currentColor);
-            // Guardar color en userData
             child.userData.currentColor = child.material.color.clone();
             if(!selectedObjects.includes(child)) selectedObjects.push(child);
           }
         }
       });
     }
-
   } else {
-    // Quitar hover, respetando color actual
-    if(hoveredObject && hoveredObject !== lastClickedObject){
+    if(hoveredObject && hoveredObject!==lastClickedObject){
       hoveredObject.material.emissive.setHex(0x000000);
     }
-    hoveredObject = null;
+    hoveredObject=null;
   }
 }
 
