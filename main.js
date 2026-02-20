@@ -2,6 +2,8 @@ import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?mo
 import { GLTFLoader } from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module'; 
 import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module'; 
 
+let paintEnabled = true; // variable global que controla si se puede pintar
+
 // ===================== ESCENA Y CÁMARA ===================== 
 const scene = new THREE.Scene(); 
 scene.background = new THREE.Color(0xeeeeee); 
@@ -116,7 +118,6 @@ colors.forEach(color=>{
 }); 
 
 // ================= BOTÓN DESACTIVAR PINTAR =================
-let paintEnabled = true; // variable global que controla si se puede pintar
 
 const disablePaintBtn = document.createElement('div');
 disablePaintBtn.style.gridColumn = 'span 2'; // ocupa 4 columnas
@@ -410,6 +411,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
