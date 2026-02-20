@@ -107,7 +107,11 @@ colors.forEach(color=>{
   btn.style.background=color; 
   btn.style.cursor='pointer'; 
   btn.title=color; 
-  btn.addEventListener('click',()=>{ currentColor=color; }); 
+  btn.addEventListener('click', () => { 
+    currentColor = color; 
+    paintEnabled = true;  // activa el pintar al elegir un color
+    disablePaintBtn.style.opacity = '1'; // opcional: refleja estado activo
+});
   paletteDiv.appendChild(btn); 
 }); 
 
@@ -115,7 +119,8 @@ colors.forEach(color=>{
 let paintEnabled = true; // variable global que controla si se puede pintar
 
 const disablePaintBtn = document.createElement('div');
-disablePaintBtn.style.gridColumn = 'span 4'; // ocupa 4 columnas
+disablePaintBtn.style.gridColumn = 'span 2'; // ocupa 4 columnas
+disablePaintBtn.style.gridRow = 'span 2';
 disablePaintBtn.style.height = '25px';
 disablePaintBtn.style.background = '#ffffff';
 disablePaintBtn.style.position = 'relative';
@@ -405,6 +410,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
