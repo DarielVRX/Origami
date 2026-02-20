@@ -304,7 +304,7 @@ function onMouseMove(event){
 } 
 
 function onMouseDown(event){ 
-    if(event.button===0 && paintEnabled){ 
+    if(event.button===0){ 
       isDrawing=true; 
       onMouseMove(event); 
       if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555); 
@@ -389,4 +389,5 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix(); 
   renderer.setSize(window.innerWidth,window.innerHeight); 
 });
+
 
