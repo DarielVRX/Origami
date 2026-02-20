@@ -6,7 +6,7 @@ import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/cont
 const scene = new THREE.Scene(); 
 scene.background = new THREE.Color(0xeeeeee); 
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000); 
-camera.position.set(0, 22, 70); 
+camera.position.set(0, 22, 80); 
 const renderer = new THREE.WebGLRenderer({antialias:true}); 
 renderer.setSize(window.innerWidth, window.innerHeight); 
 document.body.appendChild(renderer.domElement); 
@@ -217,7 +217,7 @@ cameraLockBtn.addEventListener('click', () => {
 });
 
 // ================= INTERACCIONES ================= 
-const maxDistance = 90;
+const maxDistance = 80;
 
 renderer.domElement.addEventListener('mousemove',onMouseMove);
 renderer.domElement.addEventListener('mousedown',onMouseDown);
@@ -367,5 +367,6 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
