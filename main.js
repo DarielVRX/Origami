@@ -117,37 +117,6 @@ colors.forEach(color=>{
   paletteDiv.appendChild(btn); 
 }); 
 
-// ================= BOTÓN DESACTIVAR PINTAR =================
-const disablePaintBtn = document.createElement('div');
-disablePaintBtn.style.gridColumn = 'span 2'; 
-disablePaintBtn.style.gridRow = 'span 2';
-disablePaintBtn.style.height = '25px';
-disablePaintBtn.style.background = '#ffffff';
-disablePaintBtn.style.position = 'relative';
-disablePaintBtn.style.cursor = 'pointer';
-disablePaintBtn.title = "Desactivar Pintar";
-
-// línea diagonal roja
-const line = document.createElement('div');
-line.style.position = 'absolute';
-line.style.width = '6px';
-line.style.height = '200%';
-line.style.background = 'red';
-line.style.transform = 'rotate(45deg)';
-line.style.top = '0';
-line.style.left = '50%';
-line.style.transformOrigin = 'center';
-disablePaintBtn.appendChild(line);
-
-// click alterna pintar/desactivar
-disablePaintBtn.addEventListener('click', () => {
-  paintEnabled = !paintEnabled;
-  disablePaintBtn.style.opacity = paintEnabled ? '0.6' : '1';
-});
-
-// insertar el botón arriba de la paleta
-paletteDiv.insertBefore(disablePaintBtn, paletteDiv.firstChild);
-
 // ================= SLIDER PUNTERO ================= 
 const brushSlider = document.createElement('input'); 
 brushSlider.type='range'; 
@@ -232,7 +201,7 @@ exportImgBtn.addEventListener('click',()=>{
   },500); 
 }); 
 
-// ================= BLOQUEO DE CAMARA =================
+// ================= BLOQUEO DE CAMARA Y PINTAR =================
 let cameraLocked = false; 
 const cameraLockBtn = document.createElement('button'); 
 cameraLockBtn.textContent = "Bloquear Cámara"; 
@@ -247,9 +216,9 @@ document.body.appendChild(cameraLockBtn);
 
 cameraLockBtn.addEventListener('click', () => { 
   cameraLocked = !cameraLocked; 
-  // Solo deshabilitar rotación y pan, pero mantener zoom y updates para raycaster
   controls.enableRotate = !cameraLocked; 
-  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara"; 
+  paintEnabled = cameraLocked; // Pintar solo si cámara bloqueada
+  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara (Pintar habilitado)" : "Bloquear Cámara (Pintar deshabilitado)"; 
 }); 
 
 // ================= INTERACCIONES ================= 
@@ -277,7 +246,7 @@ function onMouseMove(event){
       if(hoveredObject !== lastClickedObject){ 
         hoveredObject.material.emissive.setHex(0x333333); 
       } 
-      if(isDrawing && paintEnabled){ 
+      if(isDrawing){ 
         glbModel.traverse(child=>{ 
           if(child.isMesh){ 
             child.geometry.computeBoundingSphere(); 
@@ -389,5 +358,6 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix(); 
   renderer.setSize(window.innerWidth,window.innerHeight); 
 });
+
 
 
