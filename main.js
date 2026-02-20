@@ -66,7 +66,7 @@ loader.load('ModeloGLB.glb', (gltf) => {
 
 // ================= PALETA DE 200 COLORES GRADUAL ================= 
 const colors = ['#000000','#888888','#ffffff']; 
-const totalColors = 97; 
+const totalColors = 197; 
 for(let i=0;i<totalColors;i++){ 
   const hue = (i/totalColors)*360; 
   const saturation = 80; 
@@ -107,11 +107,7 @@ colors.forEach(color=>{
   btn.style.background=color; 
   btn.style.cursor='pointer'; 
   btn.title=color; 
-  btn.addEventListener('click', () => { 
-    currentColor = color; 
-    paintEnabled = true;  // activa el pintar al elegir un color
-    disablePaintBtn.style.opacity = '1'; // opcional: refleja estado activo
-});
+  btn.addEventListener('click',()=>{ currentColor=color; }); 
   paletteDiv.appendChild(btn); 
 }); 
 
@@ -278,7 +274,6 @@ function onMouseMove(event){
     }
     hoveredObject = null;
   }
-  }
 }
 
 function onMouseDown(event){
@@ -286,7 +281,6 @@ function onMouseDown(event){
     isDrawing=true;
     onMouseMove(event);
     if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555);
-  }
   }
 }
 
@@ -335,7 +329,6 @@ renderer.domElement.addEventListener('touchend', (event) => {
 
 // ================= FUNCION HOVER PARA TACTIL =================
 function onTouchHover(touchVec2) {
-  if (isDrawing && paintEnabled) {
   raycaster.setFromCamera(touchVec2, camera);
   const intersects = raycaster.intersectObjects(glbModel.children, true);
 
@@ -358,7 +351,6 @@ function onTouchHover(touchVec2) {
       }
     });
   }
-  }
 }
 
 // ================= ANIMACIÓN ================= 
@@ -375,8 +367,6 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
-
-
 
 
 
