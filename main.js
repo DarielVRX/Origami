@@ -122,7 +122,7 @@ brushSlider.style.top='20px';
 brushSlider.style.left='50%';
 brushSlider.style.transform = 'translateX(-50%)';
 brushSlider.style.zIndex=1000; 
-brushSlider.style.width='100px'; 
+brushSlider.style.width='1000px'; 
 document.body.appendChild(brushSlider); 
 
 const brushCircle = document.createElement('div'); 
@@ -212,9 +212,7 @@ cameraLockBtn.addEventListener('click', () => {
   cameraLocked = !cameraLocked;
 
   // Solo deshabilitar rotación y pan, pero mantener zoom y updates para raycaster
-  controls.enableRotate = !cameraLocked;   // Bloquea rotación con un dedo
-  controls.enablePan = false;              // Siempre bloqueamos pan
-  controls.enableZoom = true;              // Mantener zoom con pellizco
+  controls.enableRotate = !cameraLocked;
   cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara";
 });
 
@@ -300,5 +298,6 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
