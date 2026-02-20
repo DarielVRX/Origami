@@ -94,7 +94,7 @@ paletteDiv.style.right='10px';
 paletteDiv.style.display='grid'; 
 paletteDiv.style.gridTemplateColumns='repeat(6,1fr)'; 
 paletteDiv.style.gridAutoRows='1fr'; 
-paletteDiv.style.gap='4px'; 
+paletteDiv.style.gap='6px'; 
 paletteDiv.style.background='rgba(255,255,255,0.95)'; 
 paletteDiv.style.padding='5px'; 
 paletteDiv.style.maxHeight='60vh'; 
@@ -131,8 +131,8 @@ disablePaintBtn.title = "Desactivar Pintar";
 // línea diagonal roja
 const line = document.createElement('div');
 line.style.position = 'absolute';
-line.style.width = '2px';
-line.style.height = '100%';
+line.style.width = '6px';
+line.style.height = '200%';
 line.style.background = 'red';
 line.style.transform = 'rotate(45deg)';
 line.style.top = '0';
@@ -255,7 +255,7 @@ cameraLockBtn.addEventListener('click', () => {
 });
 
 // ================= INTERACCIONES ================= 
-const maxDistance = 70;
+const maxDistance = 90;
 
 renderer.domElement.addEventListener('mousemove',onMouseMove);
 renderer.domElement.addEventListener('mousedown',onMouseDown);
@@ -263,7 +263,6 @@ renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
 renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
 
 function onMouseMove(event){
-  if (isDrawing && paintEnabled) {
   if(!glbModel) return;
 
   mouse.x = (event.clientX / window.innerWidth)*2-1;
@@ -279,17 +278,19 @@ function onMouseMove(event){
     const hitPoint = intersects[0].point;
     const obj = intersects[0].object;
 
+    // Restaurar hover del anterior
     if(hoveredObject && hoveredObject !== obj && hoveredObject !== lastClickedObject){
       hoveredObject.material.emissive.setHex(0x000000);
     }
-
     hoveredObject = obj;
 
+    // Resaltar
     if(hoveredObject !== lastClickedObject){
       hoveredObject.material.emissive.setHex(0x333333);
     }
 
-    if(isDrawing){
+    // Solo pintar si está activo
+    if(isDrawing && paintEnabled){
       glbModel.traverse(child=>{
         if(child.isMesh){
           child.geometry.computeBoundingSphere();
@@ -313,17 +314,15 @@ function onMouseMove(event){
     }
     hoveredObject = null;
   }
-  }
 }
 
 function onMouseDown(event){
-  if (isDrawing && paintEnabled) {
-  if(event.button===0){
-    isDrawing=true;
-    onMouseMove(event);
+  if (paintEnabled && event.button === 0) {
+    isDrawing = true;
+    onMouseMove(event); // para que pinte inmediatamente
     if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555);
   }
-  }
+}
 }
 
 // ================= INTERACCIONES TÁCTILES =================
@@ -411,6 +410,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
