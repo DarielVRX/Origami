@@ -556,7 +556,7 @@ function onMouseMove(event){
 
       } 
 
-      if(isDrawing && paintEnabled){ 
+      if(isDrawing){ 
 
         glbModel.traverse(child=>{ 
 
@@ -611,7 +611,7 @@ function onMouseMove(event){
 function onMouseDown(event){ 
 
 
-    if(event.button===0 && paintEnabled){ 
+    if(event.button===0){ 
 
 
     if(event.button===0){ 
@@ -783,3 +783,4 @@ window.addEventListener('resize',()=>{
   renderer.setSize(window.innerWidth,window.innerHeight); 
 
 });
+
