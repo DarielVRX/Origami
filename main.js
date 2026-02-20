@@ -260,7 +260,6 @@ renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
 renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault()); 
 
 function onMouseMove(event){ 
-  if (isDrawing && paintEnabled) { 
     if(!glbModel) return; 
     mouse.x = (event.clientX / window.innerWidth)*2-1; 
     mouse.y = -(event.clientY / window.innerHeight)*2+1; 
@@ -278,7 +277,7 @@ function onMouseMove(event){
       if(hoveredObject !== lastClickedObject){ 
         hoveredObject.material.emissive.setHex(0x333333); 
       } 
-      if(isDrawing){ 
+      if(isDrawing && paintEnabled){ 
         glbModel.traverse(child=>{ 
           if(child.isMesh){ 
             child.geometry.computeBoundingSphere(); 
@@ -305,8 +304,7 @@ function onMouseMove(event){
 } 
 
 function onMouseDown(event){ 
-  if (isDrawing && paintEnabled) { 
-    if(event.button===0){ 
+    if(event.button===0 && paintEnabled){ 
       isDrawing=true; 
       onMouseMove(event); 
       if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555); 
@@ -391,3 +389,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix(); 
   renderer.setSize(window.innerWidth,window.innerHeight); 
 });
+
