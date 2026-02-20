@@ -118,8 +118,9 @@ brushSlider.min='1';
 brushSlider.max='10'; 
 brushSlider.value=brushSize; 
 brushSlider.style.position='fixed'; 
-brushSlider.style.bottom='100px'; 
-brushSlider.style.left='10px'; 
+brushSlider.style.top='20px'; 
+brushSlider.style.left='50%';
+brushSlider.style.transform = 'translateX(-50%)';
 brushSlider.style.zIndex=1000; 
 brushSlider.style.width='100px'; 
 document.body.appendChild(brushSlider); 
@@ -295,3 +296,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
