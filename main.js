@@ -284,6 +284,75 @@ function onMouseDown(event){
   }
 }
 
+// ================= INTERACCIONES TÁCTILES =================
+renderer.domElement.addEventListener('touchstart', (event) => {
+  if (!glbModel) return;
+
+  if (event.touches.length === 1) {
+    // Un dedo: dibujar
+    isDrawing = true;
+
+    // Actualizar posición del touch como mouse
+    const touch = event.touches[0];
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+    onTouchHover(mouse);
+  }
+  // Dos dedos: orbitar y zoom
+  if (event.touches.length === 2) {
+    // Activamos controles para zoom/pinch
+    controls.enableRotate = !cameraLocked;
+    controls.enableZoom = true;
+  }
+}, {passive: false});
+
+renderer.domElement.addEventListener('touchmove', (event) => {
+  if (!glbModel) return;
+  if (event.touches.length === 1 && isDrawing) {
+    const touch = event.touches[0];
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+    onTouchHover(mouse);
+
+    brushCircle.style.left = touch.clientX - brushCircle.offsetWidth / 2 + 'px';
+    brushCircle.style.top = touch.clientY - brushCircle.offsetHeight / 2 + 'px';
+  }
+}, {passive: false});
+
+renderer.domElement.addEventListener('touchend', (event) => {
+  if (event.touches.length === 0) {
+    isDrawing = false;
+  }
+}, {passive: false});
+
+// ================= FUNCION HOVER PARA TACTIL =================
+function onTouchHover(touchVec2) {
+  raycaster.setFromCamera(touchVec2, camera);
+  const intersects = raycaster.intersectObjects(glbModel.children, true);
+
+  if (intersects.length > 0 && intersects[0].distance <= maxDistance) {
+    const hitPoint = intersects[0].point;
+
+    glbModel.traverse(child => {
+      if (child.isMesh) {
+        child.geometry.computeBoundingSphere();
+        const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld);
+        const dist = sphere.center.distanceTo(hitPoint);
+        if (dist <= brushSize) {
+          if (!child.userData.currentColor) {
+            child.material = child.userData.originalMaterial.clone();
+          }
+          child.material.color.set(currentColor);
+          child.userData.currentColor = child.material.color.clone();
+          if (!selectedObjects.includes(child)) selectedObjects.push(child);
+        }
+      }
+    });
+  }
+}
+
 // ================= ANIMACIÓN ================= 
 function animate(){ 
   requestAnimationFrame(animate); 
@@ -298,6 +367,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
