@@ -114,7 +114,7 @@ colors.forEach(color=>{
 // ================= SLIDER PUNTERO ================= 
 const brushSlider = document.createElement('input'); 
 brushSlider.type='range'; 
-brushSlider.min='0.1'; 
+brushSlider.min='0.5'; 
 brushSlider.max='10'; 
 brushSlider.value=brushSize; 
 brushSlider.style.position='fixed'; 
@@ -371,6 +371,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
