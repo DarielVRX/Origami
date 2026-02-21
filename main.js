@@ -64,7 +64,7 @@ loader.load('ModeloGLB.glb', (gltf) => {
   console.log("¡GLB cargado automáticamente!"); 
 }, undefined, console.error); 
 
-// ================= PALETA DE 200 COLORES GRADUAL ================= 
+// ================= PALETA DE 100 COLORES GRADUAL ================= 
 const colors = ['#000000','#888888','#ffffff']; 
 const totalColors = 97; 
 for(let i=0;i<totalColors;i++){ 
@@ -114,7 +114,7 @@ colors.forEach(color=>{
 // ================= SLIDER PUNTERO ================= 
 const brushSlider = document.createElement('input'); 
 brushSlider.type='range'; 
-brushSlider.min='1'; 
+brushSlider.min='0.1'; 
 brushSlider.max='10'; 
 brushSlider.value=brushSize; 
 brushSlider.style.position='fixed'; 
@@ -371,6 +371,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
