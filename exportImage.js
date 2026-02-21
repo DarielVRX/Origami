@@ -1,6 +1,6 @@
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { scene, camera, renderer, controls } from './core.js';
-import { glbModel } from './modelLoader.js';
+import { state } from './state.js';
 
 const exportImgBtn=document.createElement('button');
 exportImgBtn.textContent="Exportar Imagen 2x2";
