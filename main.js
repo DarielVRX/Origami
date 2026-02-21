@@ -251,21 +251,23 @@ function onMouseMove(event){
     }
 
     if(isDrawing){
-      glbModel.traverse(child=>{
-        if(child.isMesh){
-          child.geometry.computeBoundingSphere();
-          const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld);
-          const dist = sphere.center.distanceTo(hitPoint);
-          if(dist <= brushSize){
-            if(!child.userData.currentColor){
-              child.material = child.userData.originalMaterial.clone();
-            }
-            child.material.color.set(currentColor);
-            child.userData.currentColor = child.material.color.clone();
-            if(!selectedObjects.includes(child)) selectedObjects.push(child);
-          }
+  glbModel.traverse(child => {
+  if (child.isMesh) {
+    const pos = child.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const vertex = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
+      if (vertex.distanceTo(hitPoint) <= brushSize) {
+        if (!child.userData.currentColor) {
+          child.material = child.userData.originalMaterial.clone();
         }
-      });
+        child.material.color.set(currentColor);
+        child.userData.currentColor = child.material.color.clone();
+        if (!selectedObjects.includes(child)) selectedObjects.push(child);
+        break; // ya coloreamos un vértice cercano, no seguimos
+      }
+    }
+  }
+});
     }
 
   } else {
@@ -335,21 +337,23 @@ function onTouchHover(touchVec2) {
   if (intersects.length > 0 && intersects[0].distance <= maxDistance) {
     const hitPoint = intersects[0].point;
 
-    glbModel.traverse(child => {
-      if (child.isMesh) {
-        child.geometry.computeBoundingSphere();
-        const sphere = child.geometry.boundingSphere.clone().applyMatrix4(child.matrixWorld);
-        const dist = sphere.center.distanceTo(hitPoint);
-        if (dist <= brushSize) {
-          if (!child.userData.currentColor) {
-            child.material = child.userData.originalMaterial.clone();
-          }
-          child.material.color.set(currentColor);
-          child.userData.currentColor = child.material.color.clone();
-          if (!selectedObjects.includes(child)) selectedObjects.push(child);
+glbModel.traverse(child => {
+  if (child.isMesh) {
+    const pos = child.geometry.attributes.position;
+    for (let i = 0; i < pos.count; i++) {
+      const vertex = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
+      if (vertex.distanceTo(hitPoint) <= brushSize) {
+        if (!child.userData.currentColor) {
+          child.material = child.userData.originalMaterial.clone();
         }
+        child.material.color.set(currentColor);
+        child.userData.currentColor = child.material.color.clone();
+        if (!selectedObjects.includes(child)) selectedObjects.push(child);
+        break; // ya coloreamos un vértice cercano, no seguimos
       }
-    });
+    }
+  }
+});
   }
 }
 
@@ -367,6 +371,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
