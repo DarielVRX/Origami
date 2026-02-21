@@ -1,7 +1,7 @@
 // main.js
 
 import { THREE } from './core.js';
-import { OrbitControls } from './core.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module';
 
 import { state } from './state.js';
 import { loadModel } from './modelLoader.js';
