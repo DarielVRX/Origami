@@ -1,70 +1,58 @@
+// interactions.js
+
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
-import { renderer, camera } from './core.js';
 import { state } from './state.js';
-import { brushCircle } from './brush.js';
 
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-const maxDistance = 80;
+export function initInteractions() {
 
-renderer.domElement.addEventListener('mousemove', onMouseMove);
-renderer.domElement.addEventListener('mousedown', onMouseDown);
-renderer.domElement.addEventListener('mouseup', () => state.isDrawing = false);
-renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  state.raycaster = new THREE.Raycaster();
+  state.mouse = new THREE.Vector2();
 
-function onMouseMove(event){
+  window.addEventListener('pointermove', onPointerMove);
+}
 
-  if(!state.glbModel) return;
+function onPointerMove(event) {
 
-  mouse.x = (event.clientX / window.innerWidth)*2-1;
-  mouse.y = -(event.clientY / window.innerHeight)*2+1;
+  state.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  state.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  brushCircle.style.left = event.clientX - brushCircle.offsetWidth/2 + 'px';
-  brushCircle.style.top = event.clientY - brushCircle.offsetHeight/2 + 'px';
+  if (!state.glbModel) return;
 
-  raycaster.setFromCamera(mouse,camera);
-  const intersects = raycaster.intersectObjects(state.glbModel.children,true);
+  state.raycaster.setFromCamera(state.mouse, state.camera);
 
-  if(intersects.length > 0 && intersects[0].distance <= maxDistance){
+  const intersects = state.raycaster.intersectObjects(
+    state.glbModel.children,
+    true
+  );
 
-    const hitPoint = intersects[0].point;
+  if (intersects.length > 0) {
 
-    if(state.isDrawing){
+    const object = intersects[0].object;
 
-      state.glbModel.traverse(child=>{
+    if (state.hoveredObject !== object) {
 
-        if(child.isMesh){
+      resetPreviousHover();
 
-          child.geometry.computeBoundingSphere();
+      state.hoveredObject = object;
+      state.originalMaterial = object.material;
 
-          const sphere = child.geometry.boundingSphere
-            .clone()
-            .applyMatrix4(child.matrixWorld);
-
-          const dist = sphere.center.distanceTo(hitPoint);
-
-          if(dist <= state.brushSize){
-
-            if(!child.userData.currentColor){
-              child.material = child.userData.originalMaterial.clone();
-            }
-
-            child.material.color.set(state.currentColor);
-            child.userData.currentColor = child.material.color.clone();
-
-            if(!state.selectedObjects.includes(child)){
-              state.selectedObjects.push(child);
-            }
-          }
-        }
-      });
+      object.material = object.material.clone();
+      object.material.emissive = new THREE.Color(0x00ff00);
+      object.material.emissiveIntensity = 0.6;
     }
+
+  } else {
+    resetPreviousHover();
   }
 }
 
-function onMouseDown(event){
-  if(event.button===0){
-    state.isDrawing = true;
-    onMouseMove(event);
+function resetPreviousHover() {
+
+  if (state.hoveredObject) {
+    state.hoveredObject.material.dispose();
+    state.hoveredObject.material = state.originalMaterial;
+
+    state.hoveredObject = null;
+    state.originalMaterial = null;
   }
 }
