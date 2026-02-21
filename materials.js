@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
+import { THREE } from './core.js';
 
 export const baseMaterial = new THREE.MeshStandardMaterial({color:0xaaaaaa});
 
