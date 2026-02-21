@@ -1,10 +1,16 @@
+// state.js
+
 export const state = {
-  currentColor: '#ff0000',
-  brushSize: 2,
+  scene: null,
+  camera: null,
+  renderer: null,
+  controls: null,
+
   glbModel: null,
-  isDrawing: false,
+
+  raycaster: null,
+  mouse: null,
+
   hoveredObject: null,
-  lastClickedObject: null,
-  selectedObjects: [],
-  cameraLocked: false
+  originalMaterial: null
 };
