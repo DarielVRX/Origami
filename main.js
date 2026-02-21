@@ -114,7 +114,7 @@ colors.forEach(color=>{
 // ================= SLIDER PUNTERO ================= 
 const brushSlider = document.createElement('input'); 
 brushSlider.type='range'; 
-brushSlider.min='0.5'; 
+brushSlider.min='1'; 
 brushSlider.max='10'; 
 brushSlider.value=brushSize; 
 brushSlider.style.position='fixed'; 
@@ -240,52 +240,98 @@ function onMouseMove(event){
     const hitPoint = intersects[0].point;
     const obj = intersects[0].object;
 
-    if(hoveredObject && hoveredObject !== obj && hoveredObject !== lastClickedObject){
-      hoveredObject.material.emissive.setHex(0x000000);
-    }
+    // ======= HOVER / RESALTADO =======
+    glbModel.traverse(child => {
+      if(child.isMesh){
+        const pos = child.geometry.attributes.position;
+        let isClose = false;
+        for(let i=0;i<pos.count;i++){
+          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+          if(vertex.distanceTo(hitPoint)<=brushSize){
+            isClose = true;
+            break;
+          }
+        }
+
+        if(isClose){
+          if(child !== lastClickedObject){
+            child.material.emissive.setHex(0x333333); // resalte
+          }
+        } else {
+          if(child !== lastClickedObject){
+            child.material.emissive.setHex(0x000000);
+          }
+        }
+      }
+    });
 
     hoveredObject = obj;
 
-    if(hoveredObject !== lastClickedObject){
-      hoveredObject.material.emissive.setHex(0x333333);
-    }
-
+    // ======= PINTADO =======
     if(isDrawing){
-  glbModel.traverse(child => {
-  if (child.isMesh) {
-    const pos = child.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const vertex = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
-      if (vertex.distanceTo(hitPoint) <= brushSize) {
-        if (!child.userData.currentColor) {
-          child.material = child.userData.originalMaterial.clone();
+      // Si brushSize mínimo, coloreamos solo el módulo seleccionado
+      if(brushSize <= parseFloat(brushSlider.min)){
+        if(lastClickedObject){
+          lastClickedObject.material.color.set(currentColor);
+          lastClickedObject.userData.currentColor = lastClickedObject.material.color.clone();
+          if(!selectedObjects.includes(lastClickedObject)) selectedObjects.push(lastClickedObject);
         }
-        child.material.color.set(currentColor);
-        child.userData.currentColor = child.material.color.clone();
-        if (!selectedObjects.includes(child)) selectedObjects.push(child);
-        break; // ya coloreamos un vértice cercano, no seguimos
+      } else {
+        // Brush grande: colorea todos los vértices cercanos
+        glbModel.traverse(child => {
+          if(child.isMesh){
+            const pos = child.geometry.attributes.position;
+            for(let i=0;i<pos.count;i++){
+              const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+              if(vertex.distanceTo(hitPoint)<=brushSize){
+                if(!child.userData.currentColor){
+                  child.material = child.userData.originalMaterial.clone();
+                }
+                child.material.color.set(currentColor);
+                child.userData.currentColor = child.material.color.clone();
+                if(!selectedObjects.includes(child)) selectedObjects.push(child);
+                break;
+              }
+            }
+          }
+        });
       }
-    }
-  }
-});
     }
 
   } else {
-    if(hoveredObject && hoveredObject !== lastClickedObject){
-      hoveredObject.material.emissive.setHex(0x000000);
-    }
     hoveredObject = null;
+    glbModel.traverse(child => {
+      if(child.isMesh && child!==lastClickedObject){
+        child.material.emissive.setHex(0x000000);
+      }
+    });
   }
 }
 
 function onMouseDown(event){
   if(event.button===0){
-    isDrawing=true;
+    isDrawing = true;
+
+    // Raycast para detectar objeto bajo el mouse
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObjects(glbModel.children, true);
+
+    if(intersects.length > 0){
+      if(lastClickedObject && lastClickedObject !== intersects[0].object){
+        // Restaurar emissive del último clic
+        lastClickedObject.material.emissive.setHex(0x000000);
+      }
+      lastClickedObject = intersects[0].object;
+      lastClickedObject.material.emissive.setHex(0x555555); // resalte de selección
+    }
+
+    // Llamar a onMouseMove para pintar si es necesario
     onMouseMove(event);
-    if(lastClickedObject) lastClickedObject.material.emissive.setHex(0x555555);
   }
 }
-
 // ================= INTERACCIONES TÁCTILES =================
 renderer.domElement.addEventListener('touchstart', (event) => {
   if (!glbModel) return;
@@ -330,33 +376,75 @@ renderer.domElement.addEventListener('touchend', (event) => {
 }, {passive: false});
 
 // ================= FUNCION HOVER PARA TACTIL =================
-function onTouchHover(touchVec2) {
+function onTouchHover(touchVec2){
   raycaster.setFromCamera(touchVec2, camera);
   const intersects = raycaster.intersectObjects(glbModel.children, true);
 
-  if (intersects.length > 0 && intersects[0].distance <= maxDistance) {
+  if(intersects.length > 0 && intersects[0].distance <= maxDistance){
     const hitPoint = intersects[0].point;
 
-glbModel.traverse(child => {
-  if (child.isMesh) {
-    const pos = child.geometry.attributes.position;
-    for (let i = 0; i < pos.count; i++) {
-      const vertex = new THREE.Vector3().fromBufferAttribute(pos, i).applyMatrix4(child.matrixWorld);
-      if (vertex.distanceTo(hitPoint) <= brushSize) {
-        if (!child.userData.currentColor) {
-          child.material = child.userData.originalMaterial.clone();
+    // ======= HOVER / RESALTADO =======
+    glbModel.traverse(child => {
+      if(child.isMesh){
+        const pos = child.geometry.attributes.position;
+        let isClose = false;
+        for(let i=0;i<pos.count;i++){
+          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+          if(vertex.distanceTo(hitPoint)<=brushSize){
+            isClose = true;
+            break;
+          }
         }
-        child.material.color.set(currentColor);
-        child.userData.currentColor = child.material.color.clone();
-        if (!selectedObjects.includes(child)) selectedObjects.push(child);
-        break; // ya coloreamos un vértice cercano, no seguimos
+
+        if(isClose){
+          if(child !== lastClickedObject){
+            child.material.emissive.setHex(0x333333);
+          }
+        } else {
+          if(child !== lastClickedObject){
+            child.material.emissive.setHex(0x000000);
+          }
+        }
+      }
+    });
+
+    // ======= PINTADO =======
+    if(isDrawing){
+      if(brushSize <= parseFloat(brushSlider.min)){
+        if(lastClickedObject){
+          lastClickedObject.material.color.set(currentColor);
+          lastClickedObject.userData.currentColor = lastClickedObject.material.color.clone();
+          if(!selectedObjects.includes(lastClickedObject)) selectedObjects.push(lastClickedObject);
+        }
+      } else {
+        glbModel.traverse(child => {
+          if(child.isMesh){
+            const pos = child.geometry.attributes.position;
+            for(let i=0;i<pos.count;i++){
+              const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+              if(vertex.distanceTo(hitPoint)<=brushSize){
+                if(!child.userData.currentColor){
+                  child.material = child.userData.originalMaterial.clone();
+                }
+                child.material.color.set(currentColor);
+                child.userData.currentColor = child.material.color.clone();
+                if(!selectedObjects.includes(child)) selectedObjects.push(child);
+                break;
+              }
+            }
+          }
+        });
       }
     }
-  }
-});
+
+  } else {
+    glbModel.traverse(child => {
+      if(child.isMesh && child!==lastClickedObject){
+        child.material.emissive.setHex(0x000000);
+      }
+    });
   }
 }
-
 // ================= ANIMACIÓN ================= 
 function animate(){ 
   requestAnimationFrame(animate); 
@@ -371,6 +459,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
