@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
+import { THREE } from './core.js';
 import { GLTFLoader } from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene, controls } from './core.js';
 import { baseMaterial } from './materials.js';
