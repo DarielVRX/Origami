@@ -13,6 +13,7 @@ export function loadModel(){
 
     (gltf) => {
 
+      // Remover modelo anterior si existe
       if(state.glbModel){
         scene.remove(state.glbModel);
       }
@@ -26,10 +27,13 @@ export function loadModel(){
 
         if(child.isMesh){
 
+          // Aplicar material base
           child.material = baseMaterial.clone();
 
+          // Guardar material original correctamente
           child.userData.originalMaterial = child.material.clone();
 
+          // BoundingSphere para futuras optimizaciones
           child.geometry.computeBoundingSphere();
         }
 
@@ -37,6 +41,7 @@ export function loadModel(){
 
       scene.add(state.glbModel);
 
+      // Recentrar cámara al modelo
       const box = new THREE.Box3().setFromObject(state.glbModel);
       const center = box.getCenter(new THREE.Vector3());
 
