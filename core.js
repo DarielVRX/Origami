@@ -1,6 +1,8 @@
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module';
 
+export { THREE };
+
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeeeeee);
 
@@ -24,7 +26,10 @@ controls.mouseButtons = {
   RIGHT: THREE.MOUSE.NONE
 };
 
-scene.add(new THREE.DirectionalLight(0xffffff,1).position.set(5,10,7.5));
+const dirLight = new THREE.DirectionalLight(0xffffff,1);
+dirLight.position.set(5,10,7.5);
+scene.add(dirLight);
+
 scene.add(new THREE.AmbientLight(0x404040));
 scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1.2));
 scene.add(new THREE.AxesHelper(5));
