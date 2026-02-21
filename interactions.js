@@ -1,6 +1,6 @@
 // interactions.js
 
-import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
+import { THREE } from './core.js';
 import { state } from './state.js';
 
 export function initInteractions() {
