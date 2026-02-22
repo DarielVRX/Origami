@@ -44,7 +44,7 @@ let selectedObjects = [];
 let isDrawing = false;
 let currentColor = '#ff0000';
 let brushSize = 1;
-
+//---------------------------------------------------------
 // ===================== CARGA DE GLB =====================
 function loadGLB(file){
     const url = URL.createObjectURL(file);
@@ -215,3 +215,4 @@ window.addEventListener('resize',()=>{
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
