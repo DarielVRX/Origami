@@ -1,3 +1,7 @@
+// ─────────────────────────────────────────────────────────────
+// ui.js — Construcción de UI (FAB, paleta, brush circle, toast)
+// ─────────────────────────────────────────────────────────────
+
 export function buildUI({ onCameraLockChange }) {
 
   // ─────────────────────────────
@@ -26,7 +30,7 @@ export function buildUI({ onCameraLockChange }) {
   document.body.appendChild(fabGroup);
 
   // ─────────────────────────────
-  // Botón Lock Cámara
+  // Lock Cámara
   // ─────────────────────────────
   const fabLock = document.createElement('button');
   fabLock.className = 'fab-child';
@@ -41,18 +45,12 @@ export function buildUI({ onCameraLockChange }) {
   });
 
   // ─────────────────────────────
-  // Contenedor hijos
-  // ─────────────────────────────
-  const fabChildren = document.createElement('div');
-  fabChildren.id = 'fab-children';
-  fabGroup.appendChild(fabChildren);
-
-  // ─────────────────────────────
-  // Botón Color (AHORA ES EL PRINCIPAL)
+  // Botón Color (principal)
   // ─────────────────────────────
   const fabColor = document.createElement('button');
   fabColor.className = 'fab-child';
   fabColor.title = 'Seleccionar color';
+  fabGroup.appendChild(fabColor);
 
   const colorPreview = document.createElement('div');
   Object.assign(colorPreview.style, {
@@ -64,7 +62,6 @@ export function buildUI({ onCameraLockChange }) {
   });
 
   fabColor.appendChild(colorPreview);
-  fabChildren.appendChild(fabColor);
 
   // ─────────────────────────────
   // Paleta
@@ -92,19 +89,30 @@ export function buildUI({ onCameraLockChange }) {
     });
   });
 
-  // Abrir/cerrar paleta directamente
   fabColor.addEventListener('click', () => {
     palette.style.display =
       palette.style.display === 'none' ? 'flex' : 'none';
   });
 
-  // ─────────────────────────────
-  // Callback gotero
-  // ─────────────────────────────
   function onColorPicked(hex) {
     colorPreview.style.background = hex;
     brushCircle.style.borderColor = hex;
   }
 
   return { brushCircle, onColorPicked };
+}
+
+// ─────────────────────────────
+// Toast (SE RESTAURA)
+// ─────────────────────────────
+export function showToast(message) {
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.innerText = message;
+  document.body.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2000);
 }
