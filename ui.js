@@ -477,47 +477,6 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
   const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
   const fabPalette = makeFabChild('🎨', 'Paleta de colores');
 
-  // ── Después de crear fabPalette y currentColorPreview ──
-
-// Función helper para contraste (blanco/negro según fondo)
-function getContrastYIQ(hexcolor){
-    hexcolor = hexcolor.replace('#','');
-    const r = parseInt(hexcolor.substr(0,2),16);
-    const g = parseInt(hexcolor.substr(2,2),16);
-    const b = parseInt(hexcolor.substr(4,2),16);
-    const yiq = (r*299 + g*587 + b*114)/1000;
-    return (yiq >= 128) ? '#000' : '#fff';
-}
-
-// Función que actualiza el FAB de paleta
-const updateFabPaletteIcon = (color) => {
-    fabPalette.textContent = '🎨';              // Emoji de paleta
-    fabPalette.style.background = color;        // Color actual como fondo
-    fabPalette.style.color = getContrastYIQ(color); // Contraste para emoji
-};
-
-// Inicializar con color por defecto
-updateFabPaletteIcon(currentColorPreview.style.background);
-
-// ── Sobrescribir onColorPicked para sincronizar FAB y preview ──
-const originalOnColorPicked = (color) => {
-    currentColorPreview.style.background = color;
-    updateFabPaletteIcon(color);
-};
-
-// ── En el return de buildUI, reemplazar onColorPicked ──
-return {
-    brushCircle,
-    currentColorBtn: currentColorPreview,
-    onColorPicked: (color) => {
-        setCurrentColor(color);
-        setEyedropperActive(false);
-        eyedropperBtn.classList.remove('active');
-        document.body.classList.remove('eyedropper-cursor');
-        originalOnColorPicked(color); // actualiza FAB y preview
-    }
-};
-  
   // Botón + principal
   const fabMain = document.createElement('div');
   fabMain.id = 'fab-main'; fabMain.className = 'fab';
@@ -642,11 +601,11 @@ return {
     brushCircle,
     currentColorBtn: currentColorPreview,  // alias para paint.js
     onColorPicked: (color) => {
-    setCurrentColor(color);
-    setEyedropperActive(false);
-    eyedropperBtn.classList.remove('active');
-    document.body.classList.remove('eyedropper-cursor');
-    originalOnColorPicked(color); // actualiza FAB y preview
+      setCurrentColor(color);
+      setEyedropperActive(false);
+      eyedropperBtn.classList.remove('active');
+      document.body.classList.remove('eyedropper-cursor');
+      currentColorPreview.style.background = color;
     }
   };
 }
