@@ -39,6 +39,7 @@ let glbModel = null;
 // ===================== RAYCASTER =====================
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
+const maxDistance = 80;
 
 // ===================== CARGAR GLB AUTOMÁTICAMENTE =====================
 loader.load('ModeloGLB.glb', (gltf)=>{
@@ -75,7 +76,7 @@ function hslToHex(h,s,l){
   s/=100;l/=100;
   const k=n=>(n+h/30)%12;
   const a=s*Math.min(l,1-l);
-  const f=n=>{ const val=l - Math.max(Math.min(k(n)-3,9-k(n),1),-1)*a; return Math.round(255*val).toString(16).padStart(2,'0'); };
+  const f=n=>{ const val=l - a * Math.max(Math.min(k(n)-3,9-k(n),1),-1); return Math.round(255*val).toString(16).padStart(2,'0'); };
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
@@ -90,6 +91,18 @@ paletteWrapper.style.flexDirection='column';
 paletteWrapper.style.alignItems='center';
 document.body.appendChild(paletteWrapper);
 
+// Botón toggle paleta
+const paletteToggleBtn = document.createElement('button');
+paletteToggleBtn.innerHTML='&#x1F308;'; // icono arcoiris
+paletteToggleBtn.style.fontSize='1.5em';
+paletteToggleBtn.style.width='40px';
+paletteToggleBtn.style.height='40px';
+paletteToggleBtn.style.borderRadius='6px';
+paletteToggleBtn.style.cursor='pointer';
+paletteToggleBtn.style.border='2px solid #000';
+paletteToggleBtn.style.background='#fff';
+paletteWrapper.appendChild(paletteToggleBtn);
+
 // Botón color actual
 const currentColorBtn = document.createElement('div');
 currentColorBtn.style.width='40px';
@@ -98,7 +111,6 @@ currentColorBtn.style.borderRadius='6px';
 currentColorBtn.style.border='2px solid #000';
 currentColorBtn.style.background=currentColor;
 currentColorBtn.style.cursor='pointer';
-currentColorBtn.title='Click para abrir la paleta';
 currentColorBtn.style.display='flex';
 currentColorBtn.style.alignItems='center';
 currentColorBtn.style.justifyContent='center';
@@ -107,7 +119,7 @@ paletteWrapper.appendChild(currentColorBtn);
 
 // Contenedor de paleta
 const paletteDiv = document.createElement('div');
-paletteDiv.style.display='none'; // inicialmente oculta
+paletteDiv.style.display='none';
 paletteDiv.style.marginTop='5px';
 paletteDiv.style.padding='5px';
 paletteDiv.style.background='rgba(255,255,255,0.95)';
@@ -119,9 +131,8 @@ paletteDiv.style.maxHeight='60vh';
 paletteDiv.style.overflowY='auto';
 paletteWrapper.appendChild(paletteDiv);
 
-// Mostrar/ocultar paleta
-currentColorBtn.addEventListener('click',()=>{
-  paletteDiv.style.display = paletteDiv.style.display==='none'?'grid':'none';
+paletteToggleBtn.addEventListener('click',()=>{
+    paletteDiv.style.display = paletteDiv.style.display==='none'?'grid':'none';
 });
 
 // Crear colores
@@ -135,45 +146,48 @@ colors.forEach(color=>{
   btn.title=color;
   btn.addEventListener('mouseenter',()=>btn.style.outline='2px solid yellow');
   btn.addEventListener('mouseleave',()=>btn.style.outline='none');
-  btn.addEventListener('click',()=>{
-    currentColor=color;
-    currentColorBtn.style.background=color;
-    paletteDiv.style.display='none';
-    closeHamburgerMenu();
-  });
+  btn.addEventListener('click',()=>{ currentColor=color; currentColorBtn.style.background=color; paletteDiv.style.display='none'; });
   paletteDiv.appendChild(btn);
 });
 
-// ===================== SLIDER PUNTERO =====================
-const sliderBtn = document.createElement('div');
-sliderBtn.style.width='30px';
-sliderBtn.style.height='30px';
-sliderBtn.style.background='#ccc';
-sliderBtn.style.border='1px solid #888';
-sliderBtn.style.borderRadius='4px';
-sliderBtn.style.cursor='pointer';
-sliderBtn.title='Brush size';
-sliderBtn.style.position='fixed';
-sliderBtn.style.top='10px';
-sliderBtn.style.left='50%';
-sliderBtn.style.transform='translateX(-50%)';
-sliderBtn.style.zIndex=1000;
-document.body.appendChild(sliderBtn);
+// ===================== SLIDER COLLAPSABLE =====================
+const sliderWrapper = document.createElement('div');
+sliderWrapper.style.position='fixed';
+sliderWrapper.style.top='10px';
+sliderWrapper.style.right='10px';
+sliderWrapper.style.zIndex=1000;
+sliderWrapper.style.display='flex';
+sliderWrapper.style.flexDirection='column';
+sliderWrapper.style.alignItems='center';
+document.body.appendChild(sliderWrapper);
 
-const brushSlider = document.createElement('input');
+// Botón toggle slider
+const sliderBtn = document.createElement('button');
+sliderBtn.innerHTML='&#x1F39A;'; // icono estilo "slider"
+sliderBtn.style.fontSize='1.5em';
+sliderBtn.style.width='40px';
+sliderBtn.style.height='40px';
+sliderBtn.style.borderRadius='6px';
+sliderBtn.style.cursor='pointer';
+sliderBtn.style.border='2px solid #000';
+sliderBtn.style.background='#fff';
+sliderBtn.style.marginBottom='5px';
+sliderWrapper.appendChild(sliderBtn);
+
+// Slider oculto por defecto
 brushSlider.type='range';
 brushSlider.min='1';
 brushSlider.max='10';
 brushSlider.value='1';
-brushSlider.style.position='fixed';
-brushSlider.style.top='50px';
-brushSlider.style.left='50%';
-brushSlider.style.transform='translateX(-50%)';
-brushSlider.style.zIndex=1000;
-brushSlider.style.width='300px';
+brushSlider.style.width='100px';
 brushSlider.style.display='none';
-document.body.appendChild(brushSlider);
+sliderWrapper.appendChild(brushSlider);
 
+sliderBtn.addEventListener('click',()=> {
+    brushSlider.style.display = brushSlider.style.display==='none'?'block':'none';
+});
+
+// Slider puntero circle
 const brushCircle = document.createElement('div');
 brushCircle.style.position='fixed';
 brushCircle.style.border='2px solid red';
@@ -184,10 +198,6 @@ brushCircle.style.height=brushSize*10+'px';
 brushCircle.style.transition='opacity 0.3s';
 document.body.appendChild(brushCircle);
 
-sliderBtn.addEventListener('click',()=>{
-  brushSlider.style.display = brushSlider.style.display==='none'?'block':'none';
-});
-
 brushSlider.addEventListener('input',()=>{
   brushSize=parseFloat(brushSlider.value);
   brushCircle.style.width=brushSize*10+'px';
@@ -196,77 +206,75 @@ brushSlider.addEventListener('input',()=>{
   setTimeout(()=>brushCircle.style.opacity=0,2000);
 });
 
-// ===================== TEXTO ARCHIVO CARGADO =====================
-const fileText = document.createElement('div');
-fileText.style.position='fixed';
-fileText.style.top='40px'; // un poco más arriba del slider
-fileText.style.left='50%';
-fileText.style.transform='translateX(-50%)';
-fileText.style.zIndex=1000;
-fileText.style.padding='5px 10px';
-fileText.style.background='rgba(0,0,0,0.1)'; // baja opacidad
-fileText.style.borderRadius='6px';
-fileText.style.color='#000';
-fileText.style.fontSize='0.9em';
-fileText.style.textAlign='center';
-fileText.textContent='No se ha seleccionado archivo';
-document.body.appendChild(fileText);
-
-// ===================== MENU HAMBURGUESA =====================
-const hamburgerBtn = document.createElement('div');
-hamburgerBtn.style.width='30px';
-hamburgerBtn.style.height='30px';
-hamburgerBtn.style.background='#ccc';
-hamburgerBtn.style.border='1px solid #888';
-hamburgerBtn.style.borderRadius='4px';
-hamburgerBtn.style.cursor='pointer';
-hamburgerBtn.title='Menu';
-hamburgerBtn.style.position='fixed';
-hamburgerBtn.style.left='10px';
-hamburgerBtn.style.bottom='10px';
-hamburgerBtn.style.zIndex=1000;
-document.body.appendChild(hamburgerBtn);
-
-const hamburgerMenu = document.createElement('div');
-hamburgerMenu.style.position='fixed';
-hamburgerMenu.style.bottom='50px';
-hamburgerMenu.style.left='10px';
-hamburgerMenu.style.display='none'; // oculto inicialmente
-hamburgerMenu.style.flexDirection='column';
-hamburgerMenu.style.gap='5px';
-document.body.appendChild(hamburgerMenu);
-
-hamburgerBtn.addEventListener('click',()=>{
-  hamburgerMenu.style.display = hamburgerMenu.style.display==='none'?'flex':'none';
-});
-
-function closeHamburgerMenu(){ hamburgerMenu.style.display='none'; }
-
-// ===================== BOTONES HAMBURGUESA =====================
+// ===================== BOTONES =====================
 const exportImgBtn = document.createElement('button');
 exportImgBtn.textContent="Exportar Imagen 2x2";
-exportImgBtn.style.padding='5px';
+exportImgBtn.style.position='fixed';
+exportImgBtn.style.bottom='10px';
+exportImgBtn.style.left='10px';
+exportImgBtn.style.padding='10px';
+exportImgBtn.style.fontSize='1em';
 exportImgBtn.style.cursor='pointer';
-hamburgerMenu.appendChild(exportImgBtn);
+exportImgBtn.style.zIndex=1000;
+document.body.appendChild(exportImgBtn);
 
 const exportGLBBtn = document.createElement('button');
 exportGLBBtn.textContent="Exportar GLB";
-exportGLBBtn.style.padding='5px';
+exportGLBBtn.style.position='fixed';
+exportGLBBtn.style.bottom='60px';
+exportGLBBtn.style.left='10px';
+exportGLBBtn.style.padding='10px';
+exportGLBBtn.style.fontSize='1em';
 exportGLBBtn.style.cursor='pointer';
-hamburgerMenu.appendChild(exportGLBBtn);
+exportGLBBtn.style.zIndex=1000;
+document.body.appendChild(exportGLBBtn);
 
-const cameraLockBtn = document.createElement('button');
+const cameraLockBtn=document.createElement('button');
 cameraLockBtn.textContent="Bloquear Cámara";
-cameraLockBtn.style.padding='5px';
+cameraLockBtn.style.position='fixed';
+cameraLockBtn.style.bottom='100px';
+cameraLockBtn.style.left='10px';
+cameraLockBtn.style.padding='10px';
+cameraLockBtn.style.fontSize='1em';
 cameraLockBtn.style.cursor='pointer';
-hamburgerMenu.appendChild(cameraLockBtn);
+cameraLockBtn.style.zIndex=1000;
+document.body.appendChild(cameraLockBtn);
 
-const loadFileBtn = document.createElement('input');
-loadFileBtn.type='file';
-loadFileBtn.accept='.glb,.gltf';
-loadFileBtn.style.padding='5px';
-loadFileBtn.style.cursor='pointer';
-hamburgerMenu.appendChild(loadFileBtn);
+// ===================== CARGA DE GLB =====================
+const loadBtnWrapperGLB = document.createElement('div');
+loadBtnWrapperGLB.style.position='fixed';
+loadBtnWrapperGLB.style.top='60px';
+loadBtnWrapperGLB.style.right='10px';
+loadBtnWrapperGLB.style.zIndex=1000;
+document.body.appendChild(loadBtnWrapperGLB);
+
+// Botón hamburguesa para toggle input
+const loadHamburgerBtn = document.createElement('button');
+loadHamburgerBtn.innerHTML='&#9776;';
+loadHamburgerBtn.style.fontSize='1.5em';
+loadHamburgerBtn.style.width='40px';
+loadHamburgerBtn.style.height='40px';
+loadHamburgerBtn.style.borderRadius='6px';
+loadHamburgerBtn.style.cursor='pointer';
+loadHamburgerBtn.style.border='2px solid #000';
+loadHamburgerBtn.style.background='#fff';
+loadBtnWrapperGLB.appendChild(loadHamburgerBtn);
+
+// Input oculto
+const loadFileInput = document.createElement('input');
+loadFileInput.type='file';
+loadFileInput.accept='.glb';
+loadFileInput.style.display='none';
+loadBtnWrapperGLB.appendChild(loadFileInput);
+
+// Toggle input
+loadHamburgerBtn.addEventListener('click',()=>{
+    loadFileInput.style.display = loadFileInput.style.display==='none'?'block':'none';
+});
+
+loadFileInput.addEventListener('change', (e)=>{
+    if(e.target.files.length>0) loadGLB(e.target.files[0]);
+});
 
 // ===================== INTERACCIONES =====================
 renderer.domElement.addEventListener('mousemove',onMouseMove);
@@ -274,35 +282,15 @@ renderer.domElement.addEventListener('mousedown',onMouseDown);
 renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 
-// ===================== GOTERO =====================
-const eyedropperBtn = document.createElement('div');
-eyedropperBtn.style.width='30px';
-eyedropperBtn.style.height='30px';
-eyedropperBtn.style.marginTop='5px';
-eyedropperBtn.style.borderRadius='4px';
-eyedropperBtn.style.border='2px solid #000';
-eyedropperBtn.style.background='url(data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDAwMDAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHBhdGggZD0iTTguNSAxOC41TDEwIDIwTDE2IDE0bC0xLjUtMS41TDguNSAxOC41eiIvPjwvc3ZnPg==) center/contain no-repeat';
-eyedropperBtn.style.cursor='pointer';
-eyedropperBtn.title='Activar gotero';
-paletteWrapper.appendChild(eyedropperBtn);
-
-eyedropperBtn.addEventListener('click',()=>{
-  eyedropperActive=!eyedropperActive;
-  eyedropperBtn.style.boxShadow = eyedropperActive?'0 0 8px 2px yellow':'none';
-});
-
-// ===================== FUNCIÓN HOVER Y PINTADO =====================
+// ===================== FUNCIONES DE INTERACCIÓN =====================
 function handleHoverAndPaint(intersects){
   if(intersects.length===0){
-    glbModel?.traverse(child=>{
-      if(child.isMesh && child!==lastClickedObject) child.material.emissiveIntensity=0;
-    });
+    if(!glbModel) return;
+    glbModel.traverse(child=>{ if(child.isMesh && child!==lastClickedObject) child.material.emissiveIntensity=0; });
     return;
   }
-
   const hitPoint=intersects[0].point;
   hoveredObject=intersects[0].object;
-
   glbModel.traverse(child=>{
     if(child.isMesh){
       let shouldHighlight=false;
@@ -320,27 +308,31 @@ function handleHoverAndPaint(intersects){
       }
     }
   });
-
   if(isDrawing && hoveredObject){
-    glbModel.traverse(child=>{
-      if(child.isMesh){
-        const pos=child.geometry.attributes.position;
-        for(let i=0;i<pos.count;i++){
-          const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){
-            if(!child.userData.currentColor) child.material=child.userData.originalMaterial.clone();
-            child.material.color.set(currentColor);
-            child.userData.currentColor=child.material.color.clone();
-            if(!selectedObjects.includes(child)) selectedObjects.push(child);
-            break;
+    if(brushSize<=parseFloat(brushSlider.min)){
+      hoveredObject.material.color.set(currentColor);
+      hoveredObject.userData.currentColor=hoveredObject.material.color.clone();
+      if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
+    } else{
+      glbModel.traverse(child=>{
+        if(child.isMesh){
+          const pos=child.geometry.attributes.position;
+          for(let i=0;i<pos.count;i++){
+            const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+            if(vertex.distanceTo(hitPoint)<=brushSize){
+              if(!child.userData.currentColor) child.material=child.userData.originalMaterial.clone();
+              child.material.color.set(currentColor);
+              child.userData.currentColor=child.material.color.clone();
+              if(!selectedObjects.includes(child)) selectedObjects.push(child);
+              break;
+            }
           }
         }
-      }
-    });
+      });
+    }
   }
 }
 
-// ===================== EVENTOS RATÓN =====================
 function onMouseMove(event){
   if(!glbModel) return;
   mouse.x=(event.clientX/window.innerWidth)*2-1;
@@ -361,18 +353,13 @@ function onMouseDown(event){
   const intersects=raycaster.intersectObjects(glbModel.children,true);
   if(intersects.length>0){
     const clickedObj=intersects[0].object;
-    // Gotero solo al hacer clic
     if(eyedropperActive){
       currentColor='#'+clickedObj.material.color.getHexString();
       currentColorBtn.style.background=currentColor;
       eyedropperActive=false;
-      eyedropperBtn.style.boxShadow='none';
       return;
     }
-
-    if(lastClickedObject && lastClickedObject!==clickedObj){
-      lastClickedObject.material.emissiveIntensity=0;
-    }
+    if(lastClickedObject && lastClickedObject!==clickedObj) lastClickedObject.material.emissiveIntensity=0;
     lastClickedObject=clickedObj;
     lastClickedObject.material.emissive.setHex(0xffffff);
     lastClickedObject.material.emissiveIntensity=0.05;
@@ -380,62 +367,19 @@ function onMouseDown(event){
   handleHoverAndPaint(intersects);
 }
 
-// ===================== CARGA DE GLB REPARADA =====================
-function loadGLB(file){
-  const url = URL.createObjectURL(file);
-  loader.load(url, (gltf)=>{
-    // Remover modelo anterior
-    if(glbModel) scene.remove(glbModel);
+// ===================== EVENTOS BOTONES =====================
+let cameraLocked=false;
+cameraLockBtn.addEventListener('click', ()=>{
+  cameraLocked=!cameraLocked;
+  controls.enableRotate=!cameraLocked;
+  cameraLockBtn.textContent=cameraLocked?"Desbloquear Cámara":"Bloquear Cámara";
+});
 
-    glbModel = gltf.scene;
-    glbModel.scale.set(0.5,0.5,0.5);
-    glbModel.position.set(0,0,0);
-
-    glbModel.traverse(child=>{
-      if(child.isMesh){
-        // Clonar material original
-        if(child.material){
-          child.userData.originalMaterial = child.material.clone();
-          // Si ya tenía color personalizado, reaplicar
-          if(child.userData.currentColor){
-            child.material.color.copy(child.userData.currentColor);
-          } else {
-            child.userData.currentColor = child.material.color.clone();
-          }
-        } else {
-          child.material = baseMaterial.clone();
-          child.userData.originalMaterial = child.material.clone();
-          child.userData.currentColor = child.material.color.clone();
-        }
-        // Calcular boundingSphere para raycasting
-        if(!child.geometry.boundingSphere) child.geometry.computeBoundingSphere();
-      }
-    });
-
-    scene.add(glbModel);
-
-    // Centrar controles en el modelo
-    const box = new THREE.Box3().setFromObject(glbModel);
-    const center = box.getCenter(new THREE.Vector3());
-    controls.target.copy(center);
-    controls.update();
-
-    // Actualizar texto de archivo
-    fileText.textContent = file.name;
-
-    console.log("Modelo cargado correctamente con materiales preservados.");
-  });
-}
-// ===================== EXPORTAR IMAGEN 2x2 =====================
 exportImgBtn.addEventListener('click',()=>{
   if(!glbModel) return alert("No hay modelo cargado");
   const positions=[ new THREE.Vector3(0,22,70), new THREE.Vector3(0,22,-70), new THREE.Vector3(70,22,0), new THREE.Vector3(-70,22,0) ];
-  const size=4096;
-  const gap=10;
-  const totalSize=size*2+gap;
-  const canvas=document.createElement('canvas');
-  canvas.width=totalSize;
-  canvas.height=totalSize;
+  const size=4096; const gap=10; const totalSize=size*2+gap;
+  const canvas=document.createElement('canvas'); canvas.width=totalSize; canvas.height=totalSize;
   const ctx=canvas.getContext('2d');
   const originalPos=camera.position.clone();
   const originalTarget=controls.target.clone();
@@ -445,8 +389,7 @@ exportImgBtn.addEventListener('click',()=>{
     controls.update();
     renderer.render(scene,camera);
     const imgData=renderer.domElement.toDataURL();
-    const img=new Image();
-    img.src=imgData;
+    const img=new Image(); img.src=imgData;
     const x=(i%2)*(size+gap);
     const y=Math.floor(i/2)*(size+gap);
     img.onload=()=>ctx.drawImage(img,x,y,size,size);
@@ -462,38 +405,17 @@ exportImgBtn.addEventListener('click',()=>{
   },500);
 });
 
-// ===================== EXPORTAR GLB CON COLORES =====================
 exportGLBBtn.addEventListener('click', ()=>{
   if(!glbModel) return alert("No hay modelo cargado");
   const exporter = new GLTFExporter();
-  exporter.parse(glbModel, function(result){
-    let output;
-    if(result instanceof ArrayBuffer){
-      output = result;
-      const blob = new Blob([output], {type:'model/gltf-binary'});
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'modelo.glb';
-      link.click();
-    }else{
-      output = JSON.stringify(result, null, 2);
-      const blob = new Blob([output], {type:'application/json'});
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = 'modelo.gltf';
-      link.click();
-    }
+  exporter.parse(glbModel, (result)=>{
+    const output = JSON.stringify(result, null, 2);
+    const blob = new Blob([output], {type:'application/json'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download='modelo.glb';
+    link.click();
   }, {binary:true});
-  closeHamburgerMenu();
-});
-
-// ===================== BLOQUEO DE CÁMARA =====================
-let cameraLocked=false;
-cameraLockBtn.addEventListener('click',()=>{
-  cameraLocked=!cameraLocked;
-  controls.enableRotate=!cameraLocked;
-  cameraLockBtn.textContent=cameraLocked?"Desbloquear Cámara":"Bloquear Cámara";
-  closeHamburgerMenu();
 });
 
 // ===================== ANIMACIÓN =====================
@@ -510,4 +432,3 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
-
