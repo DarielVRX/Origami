@@ -75,7 +75,7 @@ function hslToHex(h,s,l){
   s/=100;l/=100;
   const k=n=>(n+h/30)%12;
   const a=s*Math.min(l,1-l);
-  const f=n=>{ const val=l - a * Math.max(Math.min(k(n)-3,9-k(n),1),-1); return Math.round(255*val).toString(16).padStart(2,'0'); };
+  const f=n=>{ const val=l - Math.max(Math.min(k(n)-3,9-k(n),1),-1)*a; return Math.round(255*val).toString(16).padStart(2,'0'); };
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
@@ -107,7 +107,7 @@ paletteWrapper.appendChild(currentColorBtn);
 
 // Contenedor de paleta
 const paletteDiv = document.createElement('div');
-paletteDiv.style.display='none';
+paletteDiv.style.display='none'; // inicialmente oculta
 paletteDiv.style.marginTop='5px';
 paletteDiv.style.padding='5px';
 paletteDiv.style.background='rgba(255,255,255,0.95)';
@@ -153,6 +153,11 @@ sliderBtn.style.border='1px solid #888';
 sliderBtn.style.borderRadius='4px';
 sliderBtn.style.cursor='pointer';
 sliderBtn.title='Brush size';
+sliderBtn.style.position='fixed';
+sliderBtn.style.top='10px';
+sliderBtn.style.left='50%';
+sliderBtn.style.transform='translateX(-50%)';
+sliderBtn.style.zIndex=1000;
 document.body.appendChild(sliderBtn);
 
 const brushSlider = document.createElement('input');
@@ -161,7 +166,7 @@ brushSlider.min='1';
 brushSlider.max='10';
 brushSlider.value='1';
 brushSlider.style.position='fixed';
-brushSlider.style.top='20px';
+brushSlider.style.top='50px';
 brushSlider.style.left='50%';
 brushSlider.style.transform='translateX(-50%)';
 brushSlider.style.zIndex=1000;
@@ -194,12 +199,12 @@ brushSlider.addEventListener('input',()=>{
 // ===================== TEXTO ARCHIVO CARGADO =====================
 const fileText = document.createElement('div');
 fileText.style.position='fixed';
-fileText.style.top='60px';
+fileText.style.top='40px'; // un poco más arriba del slider
 fileText.style.left='50%';
 fileText.style.transform='translateX(-50%)';
 fileText.style.zIndex=1000;
 fileText.style.padding='5px 10px';
-fileText.style.background='rgba(0,0,0,0.1)';
+fileText.style.background='rgba(0,0,0,0.1)'; // baja opacidad
 fileText.style.borderRadius='6px';
 fileText.style.color='#000';
 fileText.style.fontSize='0.9em';
@@ -226,7 +231,7 @@ const hamburgerMenu = document.createElement('div');
 hamburgerMenu.style.position='fixed';
 hamburgerMenu.style.bottom='50px';
 hamburgerMenu.style.left='10px';
-hamburgerMenu.style.display='none';
+hamburgerMenu.style.display='none'; // oculto inicialmente
 hamburgerMenu.style.flexDirection='column';
 hamburgerMenu.style.gap='5px';
 document.body.appendChild(hamburgerMenu);
@@ -263,6 +268,12 @@ loadFileBtn.style.padding='5px';
 loadFileBtn.style.cursor='pointer';
 hamburgerMenu.appendChild(loadFileBtn);
 
+// ===================== INTERACCIONES =====================
+renderer.domElement.addEventListener('mousemove',onMouseMove);
+renderer.domElement.addEventListener('mousedown',onMouseDown);
+renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+
 // ===================== GOTERO =====================
 const eyedropperBtn = document.createElement('div');
 eyedropperBtn.style.width='30px';
@@ -295,10 +306,13 @@ function handleHoverAndPaint(intersects){
   glbModel.traverse(child=>{
     if(child.isMesh){
       let shouldHighlight=false;
-      const pos=child.geometry.attributes.position;
-      for(let i=0;i<pos.count;i++){
-        const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-        if(vertex.distanceTo(hitPoint)<=brushSize){ shouldHighlight=true; break; }
+      if(brushSize<=parseFloat(brushSlider.min)) shouldHighlight=(child===hoveredObject);
+      else{
+        const pos=child.geometry.attributes.position;
+        for(let i=0;i<pos.count;i++){
+          const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+          if(vertex.distanceTo(hitPoint)<=brushSize){ shouldHighlight=true; break; }
+        }
       }
       if(child!==lastClickedObject){
         child.material.emissive.setHex(0xffffff);
@@ -347,6 +361,7 @@ function onMouseDown(event){
   const intersects=raycaster.intersectObjects(glbModel.children,true);
   if(intersects.length>0){
     const clickedObj=intersects[0].object;
+    // Gotero solo al hacer clic
     if(eyedropperActive){
       currentColor='#'+clickedObj.material.color.getHexString();
       currentColorBtn.style.background=currentColor;
@@ -364,11 +379,6 @@ function onMouseDown(event){
   }
   handleHoverAndPaint(intersects);
 }
-
-renderer.domElement.addEventListener('mousemove',onMouseMove);
-renderer.domElement.addEventListener('mousedown',onMouseDown);
-renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
-renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 
 // ===================== CARGAR ARCHIVO =====================
 loadFileBtn.addEventListener('change',(event)=>{
@@ -434,11 +444,6 @@ exportImgBtn.addEventListener('click',()=>{
 // ===================== EXPORTAR GLB CON COLORES =====================
 exportGLBBtn.addEventListener('click', ()=>{
   if(!glbModel) return alert("No hay modelo cargado");
-  glbModel.traverse(child=>{
-    if(child.isMesh && child.userData.currentColor){
-      child.material.color.copy(child.userData.currentColor);
-    }
-  });
   const exporter = new GLTFExporter();
   exporter.parse(glbModel, function(result){
     let output;
