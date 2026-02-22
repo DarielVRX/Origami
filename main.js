@@ -414,26 +414,34 @@ async function uploadToGitHub(arrayBuffer, filename) {
 // ─────────────────────────────────────────────────────────────
 async function loadFromGitHub(filename) {
   const path = filename.endsWith('.glb') ? filename : filename + '.glb';
-  const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${path}`;
-
   showToast('Descargando desde GitHub…');
 
-  const res = await fetch(apiUrl, {
-    headers: {
-      'Authorization': `Bearer ${GH_TOKEN}`,
-      'Accept': 'application/vnd.github.raw+json',
-      'X-GitHub-Api-Version': '2022-11-28'
+  try {
+    // Opción 1: usar el API de GitHub y decodificar base64 (funciona en repos privados)
+    const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${path}`;
+    const res = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${GH_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      }
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${res.status}`);
     }
-  });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `HTTP ${res.status}`);
+    const data = await res.json(); // JSON con base64
+    const buffer = Uint8Array.from(atob(data.content.replace(/\n/g, '')), c => c.charCodeAt(0)).buffer;
+
+    // Cargar exactamente igual que local
+    loadGLBFromBuffer(buffer, true);
+    showToast(`✅ Cargado desde GitHub: ${path}`);
   }
-
-  const buffer = await res.arrayBuffer();
-  loadGLBFromBuffer(buffer, true);
-  showToast(`✅ Cargado desde GitHub: ${path}`);
+  catch(err) {
+    showToast(`⚠️ Error cargando desde GitHub: ${err.message}`, 5000);
+    console.error(err);
+  }
 }
 
 // Modal para elegir archivo de GitHub
@@ -1152,3 +1160,4 @@ eyedropperBtn.addEventListener('click', () => {
   controls.update();
   renderer.render(scene, camera);
 })();
+
