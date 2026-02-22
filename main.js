@@ -1,4 +1,4 @@
-importimport * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module'; 
+import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module'; 
 import { GLTFLoader } from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module'; 
 import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module'; 
 
@@ -26,8 +26,7 @@ scene.add(new THREE.AxesHelper(5));
 const baseMaterial = new THREE.MeshStandardMaterial({color:0xaaaaaa}); 
 const hoverMaterial = baseMaterial.clone(); 
 hoverMaterial.emissive.setHex(0x333333); 
-const lastClickedMaterial = baseMaterial.clone(); 
-lastClickedMaterial.emissive.setHex(0x555555); 
+let lastClickedOutline = null;
 
 // ===================== GLB ===================== 
 const loader = new GLTFLoader(); 
@@ -65,6 +64,7 @@ loader.load('ModeloGLB.glb', (gltf) => {
 }, undefined, console.error); 
 
 // ================= PALETA DE 100 COLORES GRADUAL ================= 
+let eyedropperActive = false; // estado del gotero
 const colors = ['#000000','#888888','#ffffff']; 
 const totalColors = 97; 
 for(let i=0;i<totalColors;i++){ 
@@ -94,6 +94,41 @@ paletteWrapper.style.display='flex';
 paletteWrapper.style.flexDirection='column'; 
 paletteWrapper.style.alignItems='center'; 
 document.body.appendChild(paletteWrapper); 
+
+const eyedropperBtn = document.createElement('div');
+eyedropperBtn.style.width = '30px';
+eyedropperBtn.style.height = '30px';
+eyedropperBtn.style.marginTop = '5px';
+eyedropperBtn.style.borderRadius = '4px';
+eyedropperBtn.style.border = '2px solid #000';
+eyedropperBtn.style.background = 'url(data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDAwMDAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHBhdGggZD0iTTguNSAxOC41TDEwIDIwTDE2IDE0bC0xLjUtMS41TDguNSAxOC41eiIvPjwvc3ZnPg==) center/contain no-repeat'; // icono gotero
+eyedropperBtn.style.cursor = 'pointer';
+eyedropperBtn.title = 'Activar gotero';
+paletteWrapper.appendChild(eyedropperBtn);
+
+eyedropperBtn.addEventListener('click', () => {
+  eyedropperActive = !eyedropperActive;
+  eyedropperBtn.style.boxShadow = eyedropperActive ? '0 0 8px 2px yellow' : 'none';
+});
+
+if(eyedropperActive && intersects.length > 0){
+  const obj = intersects[0].object;
+  if(obj.material && obj.material.color){
+    currentColor = '#' + obj.material.color.getHexString();
+    currentColorBtn.style.background = currentColor;
+    eyedropperActive = false;
+    eyedropperBtn.style.boxShadow = 'none';
+    return; // salir para no dibujar inmediatamente
+  }
+}
+
+if(eyedropperActive && hoveredObject){
+  currentColor = '#' + hoveredObject.material.color.getHexString();
+  currentColorBtn.style.background = currentColor;
+  eyedropperActive = false;
+  eyedropperBtn.style.boxShadow = 'none';
+  return;
+}
 
 const currentColorBtn = document.createElement('div'); 
 currentColorBtn.style.width='40px'; 
@@ -343,13 +378,31 @@ function onMouseDown(event){
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(glbModel.children, true);
 
-    if(intersects.length > 0){
-      if(lastClickedObject && lastClickedObject !== intersects[0].object){
-        lastClickedObject.material.emissive.setHex(0x000000);
-      }
-      lastClickedObject = intersects[0].object;
-      lastClickedObject.material.emissive.setHex(0x555555);
-    }
+if(intersects.length > 0){
+  const clickedObj = intersects[0].object;
+
+  // Eliminar outline previo si existe
+  if(lastClickedOutline){
+    scene.remove(lastClickedOutline);
+    lastClickedOutline.geometry.dispose();
+    lastClickedOutline.material.dispose();
+    lastClickedOutline = null;
+  }
+
+  lastClickedObject = clickedObj;
+
+  // Crear outline de bordes
+  const edges = new THREE.EdgesGeometry(clickedObj.geometry);
+  const line = new THREE.LineSegments(
+    edges,
+    new THREE.LineBasicMaterial({ color: 0xffffaa, linewidth: 2 }) // color blanco-amarillento
+  );
+  line.position.copy(clickedObj.position);
+  line.rotation.copy(clickedObj.rotation);
+  line.scale.copy(clickedObj.scale);
+  scene.add(line);
+  lastClickedOutline = line;
+}
 
     onMouseMove(event);
   }
@@ -465,5 +518,6 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
