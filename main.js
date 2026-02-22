@@ -84,39 +84,80 @@ function hslToHex(h,s,l){
   return `#${f(0)}${f(8)}${f(4)}`; 
 } 
 
-// ================= PALETA HTML ================= 
+// ================= PALETA COLLAPSABLE ================= 
+const paletteWrapper = document.createElement('div'); 
+paletteWrapper.style.position='fixed'; 
+paletteWrapper.style.bottom='10px'; 
+paletteWrapper.style.right='10px'; 
+paletteWrapper.style.zIndex=1000; 
+paletteWrapper.style.display='flex'; 
+paletteWrapper.style.flexDirection='column'; 
+paletteWrapper.style.alignItems='center'; 
+document.body.appendChild(paletteWrapper); 
+
+// Botón color actual
+const currentColorBtn = document.createElement('div'); 
+currentColorBtn.style.width='40px'; 
+currentColorBtn.style.height='40px'; 
+currentColorBtn.style.borderRadius='6px'; 
+currentColorBtn.style.border='2px solid #000'; 
+currentColorBtn.style.background=currentColor; 
+currentColorBtn.style.cursor='pointer'; 
+currentColorBtn.title = 'Click para abrir la paleta'; 
+currentColorBtn.style.display='flex'; 
+currentColorBtn.style.alignItems='center'; 
+currentColorBtn.style.justifyContent='center'; 
+currentColorBtn.style.boxShadow='0 0 5px rgba(0,0,0,0.5)'; 
+paletteWrapper.appendChild(currentColorBtn); 
+
+// Contenedor de paleta (oculto inicialmente)
 const paletteDiv = document.createElement('div'); 
-paletteDiv.style.position='fixed'; 
-paletteDiv.style.bottom='10px'; 
-paletteDiv.style.right='10px'; 
+paletteDiv.style.display='none'; 
+paletteDiv.style.marginTop='5px'; 
+paletteDiv.style.padding='5px'; 
+paletteDiv.style.background='rgba(255,255,255,0.95)'; 
 paletteDiv.style.display='grid'; 
 paletteDiv.style.gridTemplateColumns='repeat(6,1fr)'; 
 paletteDiv.style.gridAutoRows='1fr'; 
 paletteDiv.style.gap='6px'; 
-paletteDiv.style.background='rgba(255,255,255,0.95)'; 
-paletteDiv.style.padding='5px'; 
 paletteDiv.style.maxHeight='60vh'; 
 paletteDiv.style.overflowY='auto'; 
-paletteDiv.style.zIndex=1000; 
-document.body.appendChild(paletteDiv); 
+paletteWrapper.appendChild(paletteDiv); 
 
-colors.forEach(color=>{ 
+// Mostrar/ocultar paleta al hacer click
+currentColorBtn.addEventListener('click',()=>{
+  paletteDiv.style.display = paletteDiv.style.display==='none' ? 'grid':'none';
+});
+
+// Crear colores
+colors.forEach(color=>{
   const btn = document.createElement('div'); 
   btn.style.width='25px'; 
   btn.style.height='25px'; 
+  btn.style.borderRadius='4px';
   btn.style.background=color; 
   btn.style.cursor='pointer'; 
   btn.title=color; 
-  btn.addEventListener('click',()=>{ currentColor=color; }); 
+
+  // Hover: resaltar contorno
+  btn.addEventListener('mouseenter',()=>btn.style.outline='2px solid yellow'); 
+  btn.addEventListener('mouseleave',()=>btn.style.outline='none'); 
+
+  // Click: usar color
+  btn.addEventListener('click',()=>{
+    currentColor=color;
+    currentColorBtn.style.background=color;
+  });
+
   paletteDiv.appendChild(btn); 
-}); 
+});
 
 // ================= SLIDER PUNTERO ================= 
 const brushSlider = document.createElement('input'); 
 brushSlider.type='range'; 
 brushSlider.min='1'; 
 brushSlider.max='10'; 
-brushSlider.value=brushSize; 
+brushSlider.value=1; 
 brushSlider.style.position='fixed'; 
 brushSlider.style.top='20px'; 
 brushSlider.style.left='50%';
@@ -428,3 +469,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
