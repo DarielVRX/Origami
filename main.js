@@ -58,6 +58,7 @@ const baseMaterial = new THREE.MeshStandardMaterial({
 });
 
 let glbModel         = null;
+window._debug = () => glbModel.traverse(c => { if(c.isMesh) { console.log('THREE name:', c.name); } });
 let originalGLBBuffer = null;  // ArrayBuffer crudo del GLB original — clave para el export
 let meshColorMap      = new Map(); // mesh.uuid → color hex string pintado por el usuario
 let lastHovered      = null;
@@ -1027,4 +1028,5 @@ window.addEventListener('touchstart', enableTouchMode, { once: true });
   controls.update();
   renderer.render(scene, camera);
 })();
+
 
