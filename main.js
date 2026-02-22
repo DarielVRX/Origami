@@ -301,27 +301,25 @@ exportImgBtn.addEventListener('click',()=>{
   },500);
 });
 
-exportGLBBtn.addEventListener('click', ()=>{
+
+// ===================== EXPORTAR GLB FUNCIONAL =====================
+function exportGLB(){
   if(!glbModel) return alert("No hay modelo cargado");
 
-  // Asegurarse de que cada mesh tenga material actualizado
+  // Actualizar materiales con colores seleccionados
   glbModel.traverse(child=>{
     if(child.isMesh){
-      if(child.userData.currentColor){
-        child.material = child.userData.originalMaterial.clone();
-        child.material.color.copy(child.userData.currentColor);
-      } else {
-        child.material = child.userData.originalMaterial.clone();
-      }
+      child.material = child.userData.originalMaterial.clone();
+      if(child.userData.currentColor) child.material.color.copy(child.userData.currentColor);
     }
   });
 
   const exporter = new GLTFExporter();
   exporter.parse(glbModel, function(result){
     let blob;
-    if(result instanceof ArrayBuffer){ // binary glb
+    if(result instanceof ArrayBuffer){
       blob = new Blob([result], {type:'model/gltf-binary'});
-    } else { // fallback json glTF
+    } else {
       const output = JSON.stringify(result, null, 2);
       blob = new Blob([output], {type:'application/json'});
     }
@@ -330,7 +328,7 @@ exportGLBBtn.addEventListener('click', ()=>{
     link.download='modelo.glb';
     link.click();
   }, {binary:true});
-});
+}
 
 loadModelBtn.addEventListener('click',()=>fileInput.click());
 fileInput.addEventListener('change',e=>{
@@ -489,3 +487,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
