@@ -114,32 +114,68 @@ function setupModel(model) {
 // Guarda el ArrayBuffer original para el export posterior
 // ─────────────────────────────────────────────────────────────
 function loadGLBFromBuffer(buffer, isFile = false) {
-  originalGLBBuffer = buffer.slice(0); // copia defensiva
+  // Validar magic bytes ANTES de cualquier operación
+  if (buffer.byteLength < 12) {
+    console.error(`GLB demasiado pequeño: ${buffer.byteLength} bytes`);
+    return;
+  }
+  const magic = new DataView(buffer).getUint32(0, true);
+  if (magic !== 0x46546C67) {
+    console.error(`Magic inválido: 0x${magic.toString(16)} (esperado 0x46546c67). Tamaño: ${buffer.byteLength} bytes`);
+    showToast('⚠️ El archivo no es un GLB válido.');
+    return;
+  }
 
-  // GLTFLoader puede aceptar ArrayBuffer directamente
-  loader.parse(buffer, '', gltf => {
+  // Guardar copia ANTES de pasarlo al loader (parse() puede transferir/consumir el buffer)
+  originalGLBBuffer = buffer.slice(0);
+
+  loader.parse(originalGLBBuffer.slice(0), '', gltf => {
     if (glbModel) scene.remove(glbModel);
     glbModel = gltf.scene;
     lastHovered = lastClicked = null;
     setupModel(glbModel);
-    if (!isFile) console.log('ModeloGLB.glb cargado automáticamente.');
-  }, console.error);
+    console.log(`GLB cargado: ${buffer.byteLength.toLocaleString()} bytes`);
+  }, err => {
+    console.error('Error parseando GLB:', err);
+    showToast('⚠️ Error al parsear el GLB.');
+  });
 }
 
 function loadGLBFromFile(file) {
   const reader = new FileReader();
   reader.onload = e => loadGLBFromBuffer(e.target.result, true);
+  reader.onerror = () => showToast('⚠️ Error leyendo el archivo.');
   reader.readAsArrayBuffer(file);
 }
 
-// Carga automática desde la raíz del servidor
-fetch('ModeloGLB.glb')
-  .then(r => {
-    if (!r.ok) throw new Error(`No se pudo cargar ModeloGLB.glb (${r.status})`);
-    return r.arrayBuffer();
-  })
-  .then(buf => loadGLBFromBuffer(buf))
-  .catch(err => console.warn('ModeloGLB.glb no encontrado en raíz:', err.message));
+// Carga automática — usa GLTFLoader.load() en vez de fetch+parse
+// para que Three.js maneje correctamente la decodificación y el path base
+loader.load(
+  'ModeloGLB.glb',
+  gltf => {
+    if (glbModel) scene.remove(glbModel);
+    glbModel = gltf.scene;
+    lastHovered = lastClicked = null;
+    setupModel(glbModel);
+    // Re-fetch para obtener el ArrayBuffer crudo (necesario para el export)
+    fetch('ModeloGLB.glb')
+      .then(r => r.arrayBuffer())
+      .then(buf => {
+        const magic = new DataView(buf).getUint32(0, true);
+        if (magic !== 0x46546C67) throw new Error(`Magic inválido: 0x${magic.toString(16)}`);
+        originalGLBBuffer = buf;
+        console.log(`Buffer listo para export: ${buf.byteLength.toLocaleString()} bytes`);
+      })
+      .catch(err => {
+        console.warn('No se pudo guardar buffer para export:', err.message);
+        showToast('Modelo cargado, pero export deshabilitado (buffer no disponible).');
+      });
+  },
+  undefined,
+  err => {
+    console.warn('ModeloGLB.glb no encontrado, carga manual requerida.', err);
+  }
+);
 
 // ─────────────────────────────────────────────────────────────
 // EXPORTAR GLB  — ESTRATEGIA CORRECTA
@@ -156,116 +192,152 @@ fetch('ModeloGLB.glb')
 // El JSON contiene los materiales con pbrMetallicRoughness.baseColorFactor.
 // ─────────────────────────────────────────────────────────────
 function buildPatchedGLB() {
-  if (!originalGLBBuffer) return null;
+  if (!originalGLBBuffer) { showToast('⚠️ Buffer no disponible. Recarga la página.'); return null; }
 
-  const buf = originalGLBBuffer.slice(0);
+  const buf  = originalGLBBuffer.slice(0);
   const view = new DataView(buf);
 
-  // Leer cabecera GLB
-  const magic   = view.getUint32(0, true);  // 0x46546C67 = 'glTF'
-  if (magic !== 0x46546C67) { alert('El buffer original no es un GLB válido.'); return null; }
+  // ── Leer y validar cabecera GLB (12 bytes) ──
+  // Offset 0: magic 'glTF' = 0x46546C67
+  // Offset 4: version (debe ser 2)
+  // Offset 8: total file length
+  const magic      = view.getUint32(0, true);
+  const glbVersion = view.getUint32(4, true);
+  const glbLength  = view.getUint32(8, true);
 
-  const jsonLength = view.getUint32(12, true);
-  const jsonStart  = 20; // 12 header + 8 chunk header
+  if (magic !== 0x46546C67) {
+    showToast(`⚠️ Buffer inválido (magic: 0x${magic.toString(16)})`);
+    return null;
+  }
+  console.log(`GLB: v${glbVersion}, ${glbLength} bytes declarados, ${buf.byteLength} bytes reales`);
 
-  // Extraer JSON del chunk 0
-  const jsonBytes = new Uint8Array(buf, jsonStart, jsonLength);
-  const jsonStr   = new TextDecoder().decode(jsonBytes);
-  const gltf      = JSON.parse(jsonStr);
+  // ── Leer chunk 0: JSON ──
+  // Offset 12: chunk 0 length
+  // Offset 16: chunk 0 type (0x4E4F534A = 'JSON')
+  // Offset 20: chunk 0 data
+  const jsonChunkLen  = view.getUint32(12, true);
+  const jsonChunkType = view.getUint32(16, true);
+  if (jsonChunkType !== 0x4E4F534A) {
+    showToast('⚠️ El primer chunk no es JSON.');
+    return null;
+  }
+  const jsonDataStart = 20;
+  const jsonDataEnd   = jsonDataStart + jsonChunkLen;
+  if (jsonDataEnd > buf.byteLength) {
+    showToast(`⚠️ JSON chunk desborda el buffer (${jsonDataEnd} > ${buf.byteLength})`);
+    return null;
+  }
 
-  // ── Construir mapa: índice de mesh GLTF → color pintado ──
-  // Necesitamos correlacionar los meshes Three.js (por orden de traversal)
-  // con los índices de mesh en el JSON GLTF.
-  // El GLTFLoader asigna meshes en el mismo orden que gltf.meshes[].
-  const meshNodes = [];
-  if (gltf.nodes) {
-    // Recopilar nodos con mesh, en orden DFS (igual que Three.js traverse)
-    function collectNodes(nodeIdx) {
-      const node = gltf.nodes[nodeIdx];
-      if (node.mesh !== undefined) meshNodes.push({ nodeIdx, meshIdx: node.mesh });
-      if (node.children) node.children.forEach(collectNodes);
-    }
-    if (gltf.scenes && gltf.scene !== undefined) {
-      (gltf.scenes[gltf.scene].nodes || []).forEach(collectNodes);
+  const jsonBytes = new Uint8Array(buf, jsonDataStart, jsonChunkLen);
+  const gltf      = JSON.parse(new TextDecoder().decode(jsonBytes));
+
+  // ── Leer chunk 1: BIN (opcional) ──
+  const binChunkOffset = jsonDataEnd; // inmediatamente después del chunk JSON
+  let binLength = 0;
+  let binData   = new Uint8Array(0);
+  if (binChunkOffset + 8 <= buf.byteLength) {
+    binLength = view.getUint32(binChunkOffset, true);
+    // type = 0x004E4942 ('BIN')
+    const binDataStart = binChunkOffset + 8;
+    if (binDataStart + binLength <= buf.byteLength) {
+      binData = new Uint8Array(buf, binDataStart, binLength);
+    } else {
+      console.warn(`BIN chunk truncado: ${binDataStart + binLength} > ${buf.byteLength}`);
+      binLength = buf.byteLength - binDataStart;
+      binData   = new Uint8Array(buf, binDataStart, binLength);
     }
   }
 
-  // Obtener meshes THREE en el mismo orden (traverse DFS)
+  // ── Parchear materiales con colores pintados ──
+  // Correlacionar meshes Three.js (DFS) con nodos GLTF (DFS)
+  const meshNodes = [];
+  if (gltf.nodes && gltf.scenes) {
+    const visitNode = idx => {
+      const node = gltf.nodes[idx];
+      if (!node) return;
+      if (node.mesh !== undefined) meshNodes.push(node.mesh);
+      if (node.children) node.children.forEach(visitNode);
+    };
+    const rootScene = gltf.scenes[gltf.scene ?? 0];
+    (rootScene?.nodes ?? []).forEach(visitNode);
+  }
+
   const threeMeshes = [];
   if (glbModel) glbModel.traverse(c => { if (c.isMesh) threeMeshes.push(c); });
 
-  // Parchear materiales
-  meshNodes.forEach(({ meshIdx }, i) => {
+  // Materiales compartidos: clonar antes de modificar para no afectar otros meshes
+  const patchedMats = new Set();
+  meshNodes.forEach((meshIdx, i) => {
     const threeMesh = threeMeshes[i];
     if (!threeMesh) return;
-
-    // Leer color pintado (si existe)
     const hex = meshColorMap.get(threeMesh.uuid);
-    if (!hex) return; // sin cambio, mantener original
+    if (!hex) return;
 
     const c = new THREE.Color(hex);
+    // Three.js convierte sRGB→linear internamente; aquí trabajamos en linear
+    const r = Math.pow(c.r, 2.2);
+    const g = Math.pow(c.g, 2.2);
+    const b = Math.pow(c.b, 2.2);
 
-    // Encontrar el material del primitive 0 de este mesh
-    const primitives = gltf.meshes[meshIdx].primitives;
-    primitives.forEach(prim => {
-      const matIdx = prim.material;
-      if (matIdx === undefined) return;
-
+    const gltfMesh = gltf.meshes?.[meshIdx];
+    if (!gltfMesh) return;
+    gltfMesh.primitives.forEach(prim => {
+      let matIdx = prim.material;
+      // Si el material ya fue parcheado por otro mesh, crear una copia
+      if (matIdx !== undefined && patchedMats.has(matIdx)) {
+        const copy = JSON.parse(JSON.stringify(gltf.materials[matIdx]));
+        matIdx = gltf.materials.push(copy) - 1;
+        prim.material = matIdx;
+      }
+      if (matIdx === undefined) {
+        // Primitiva sin material: crear uno nuevo
+        if (!gltf.materials) gltf.materials = [];
+        matIdx = gltf.materials.push({ pbrMetallicRoughness: {} }) - 1;
+        prim.material = matIdx;
+      }
       const mat = gltf.materials[matIdx];
       if (!mat.pbrMetallicRoughness) mat.pbrMetallicRoughness = {};
-      // baseColorFactor = [R, G, B, A] en linear space
-      mat.pbrMetallicRoughness.baseColorFactor = [
-        Math.pow(c.r, 2.2),  // sRGB → linear
-        Math.pow(c.g, 2.2),
-        Math.pow(c.b, 2.2),
-        1.0
-      ];
+      mat.pbrMetallicRoughness.baseColorFactor = [r, g, b, 1.0];
+      // Eliminar baseColorTexture para que el color sólido tome efecto
+      delete mat.pbrMetallicRoughness.baseColorTexture;
+      patchedMats.add(matIdx);
     });
   });
 
-  // Re-serializar JSON con padding a múltiplo de 4 bytes
-  const newJsonStr     = JSON.stringify(gltf);
-  const newJsonEncoded = new TextEncoder().encode(newJsonStr);
+  // ── Reensamblar GLB ──
+  const newJsonEncoded = new TextEncoder().encode(JSON.stringify(gltf));
   const jsonPadded     = Math.ceil(newJsonEncoded.length / 4) * 4;
   const jsonPad        = jsonPadded - newJsonEncoded.length;
+  const binPadded      = Math.ceil(binLength / 4) * 4;
+  const binPad         = binPadded - binLength;
+  const hasBin         = binLength > 0;
 
-  // Obtener chunk BIN (si existe)
-  const binChunkStart  = jsonStart + jsonLength;
-  let binLength = 0;
-  let binData   = new Uint8Array(0);
-  if (binChunkStart + 8 <= buf.byteLength) {
-    binLength = view.getUint32(binChunkStart, true);
-    binData   = new Uint8Array(buf, binChunkStart + 8, binLength);
-  }
-  const binPadded = Math.ceil(binLength / 4) * 4;
-  const binPad    = binPadded - binLength;
-
-  // Reconstruir GLB
-  const totalLength = 12 + 8 + jsonPadded + (binLength > 0 ? 8 + binPadded : 0);
-  const out    = new ArrayBuffer(totalLength);
-  const outView = new DataView(out);
+  const totalLength = 12 + 8 + jsonPadded + (hasBin ? 8 + binPadded : 0);
+  const out      = new ArrayBuffer(totalLength);
+  const outView  = new DataView(out);
   const outBytes = new Uint8Array(out);
-
   let off = 0;
+
   // Header
-  outView.setUint32(off, 0x46546C67, true); off += 4; // magic 'glTF'
-  outView.setUint32(off, 2, true);           off += 4; // version 2
-  outView.setUint32(off, totalLength, true); off += 4; // total length
+  outView.setUint32(off, 0x46546C67, true); off += 4; // 'glTF'
+  outView.setUint32(off, 2,           true); off += 4; // version
+  outView.setUint32(off, totalLength, true); off += 4;
 
-  // JSON chunk
-  outView.setUint32(off, jsonPadded, true);  off += 4;
-  outView.setUint32(off, 0x4E4F534A, true); off += 4; // 'JSON'
-  outBytes.set(newJsonEncoded, off);         off += newJsonEncoded.length;
-  for (let i = 0; i < jsonPad; i++) { outBytes[off++] = 0x20; } // pad con espacios
+  // Chunk JSON
+  outView.setUint32(off, jsonPadded,   true); off += 4;
+  outView.setUint32(off, 0x4E4F534A,  true); off += 4; // 'JSON'
+  outBytes.set(newJsonEncoded, off);          off += newJsonEncoded.length;
+  outBytes.fill(0x20, off, off + jsonPad);    off += jsonPad; // pad con espacios
 
-  // BIN chunk (solo si hay datos)
-  if (binLength > 0) {
-    outView.setUint32(off, binPadded, true);   off += 4;
-    outView.setUint32(off, 0x004E4942, true); off += 4; // 'BIN\0'
+  // Chunk BIN
+  if (hasBin) {
+    outView.setUint32(off, binPadded,   true); off += 4;
+    outView.setUint32(off, 0x004E4942, true); off += 4; // 'BIN'
     outBytes.set(binData, off);                off += binLength;
-    for (let i = 0; i < binPad; i++) { outBytes[off++] = 0x00; }
+    outBytes.fill(0x00, off, off + binPad);    off += binPad;
   }
 
+  console.log(`GLB parcheado: ${totalLength.toLocaleString()} bytes, ${patchedMats.size} materiales modificados`);
   return out;
 }
 
