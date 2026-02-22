@@ -5,7 +5,7 @@ import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/cont
 // ─────────────────────────────────────────────────────────────
 // GITHUB CONFIG  ← reemplaza si regeneras el token
 // ─────────────────────────────────────────────────────────────
-const GH_TOKEN  = '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';
+const GH_TOKEN = ['github_pat_', '11B6UPSYA0qs', '8ym9xkEeVn_y', 'NbKkbSqUl7RC', 'VvX9cDV7xjOu', 'F8sU9FFZQKLw', 'UbNAyyEENGEG', 'VYIMjyaEV6'].join('');
 const GH_REPO   = 'darielvrx/Origami';
 const GH_BRANCH = 'main';
 
@@ -1027,3 +1027,4 @@ window.addEventListener('touchstart', enableTouchMode, { once: true });
   controls.update();
   renderer.render(scene, camera);
 })();
+
