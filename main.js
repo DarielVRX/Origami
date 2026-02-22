@@ -5,7 +5,7 @@ import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/cont
 // ─────────────────────────────────────────────────────────────
 // GITHUB CONFIG  ← reemplaza si regeneras el token
 // ─────────────────────────────────────────────────────────────
-const GH_TOKEN = ['github_pat_', '11B6UPSYA0qs', '8ym9xkEeVn_y', 'NbKkbSqUl7RC', 'VvX9cDV7xjOu', 'F8sU9FFZQKLw', 'UbNAyyEENGEG', 'VYIMjyaEV6'].join('');
+const GH_TOKEN  = ['github_pat_', '11B6UPSYA0qs', '8ym9xkEeVn_y', 'NbKkbSqUl7RC', 'VvX9cDV7xjOu', 'F8sU9FFZQKLw', 'UbNAyyEENGEG', 'VYIMjyaEV6'].join('');
 const GH_REPO   = 'darielvrx/Origami';
 const GH_BRANCH = 'main';
 
@@ -58,7 +58,6 @@ const baseMaterial = new THREE.MeshStandardMaterial({
 });
 
 let glbModel         = null;
-window._debug = () => glbModel.traverse(c => { if(c.isMesh) { console.log('THREE name:', c.name); } });
 let originalGLBBuffer = null;  // ArrayBuffer crudo del GLB original — clave para el export
 let meshColorMap      = new Map(); // mesh.uuid → color hex string pintado por el usuario
 let lastHovered      = null;
@@ -250,44 +249,31 @@ function buildPatchedGLB() {
   }
 
   // ── Construir materiales desde cero ──
-  // El GLB original no tiene materiales (solo geometría pura).
-  // Creamos un material por mesh: color pintado si existe, gris base si no.
-  // Cada primitiva recibe su propio índice de material para independencia total.
+  // El GLB no tiene materiales. Estructura plana: nodo[i].mesh === i para todos.
+  // Construimos un mapa nombre-de-mesh → color usando los nombres del GLB,
+  // correlacionándolos con los meshes Three.js que tienen el mismo nombre.
 
-  // Recopilar meshes GLTF en orden DFS (igual que Three.js traverse)
-  const meshNodes = [];
-  if (gltf.nodes && gltf.scenes) {
-    const visitNode = idx => {
-      const node = gltf.nodes[idx];
-      if (!node) return;
-      if (node.mesh !== undefined) meshNodes.push(node.mesh);
-      if (node.children) node.children.forEach(visitNode);
-    };
-    const rootScene = gltf.scenes[gltf.scene ?? 0];
-    (rootScene?.nodes ?? []).forEach(visitNode);
+  // Mapa: nombre normalizado (sin puntos) → color pintado en Three.js
+  // GLTFLoader elimina los puntos de los nombres al cargar (ej: "Modelo.559" → "Modelo559")
+  const nameToColor = new Map();
+  if (glbModel) {
+    glbModel.traverse(child => {
+      if (!child.isMesh) return;
+      const hex = meshColorMap.get(child.uuid);
+      if (hex) nameToColor.set(child.name.replace(/\./g, ''), hex);
+    });
   }
 
-  const threeMeshes = [];
-  if (glbModel) glbModel.traverse(c => { if (c.isMesh) threeMeshes.push(c); });
-
-  // Inicializar array de materiales vacío
   gltf.materials = [];
-
-  const DEFAULT = [0.6, 0.6, 0.6, 1.0]; // gris base en linear space
-
+  const DEFAULT = [0.667, 0.667, 0.667, 1.0]; // gris base en linear
   let patchedCount = 0;
 
-  meshNodes.forEach((meshIdx, i) => {
-    const gltfMesh = gltf.meshes?.[meshIdx];
-    if (!gltfMesh) return;
-
-    const threeMesh = threeMeshes[i];
-    const hex = threeMesh ? meshColorMap.get(threeMesh.uuid) : undefined;
-
+  gltf.meshes.forEach((gltfMesh, meshIdx) => {
+    const normalizedName = gltfMesh.name.replace(/\./g, '');
+    const hex = nameToColor.get(normalizedName);
     let baseColorFactor;
     if (hex) {
       const c = new THREE.Color(hex);
-      // sRGB → linear (gamma 2.2)
       baseColorFactor = [
         Math.pow(c.r, 2.2),
         Math.pow(c.g, 2.2),
@@ -299,7 +285,6 @@ function buildPatchedGLB() {
       baseColorFactor = DEFAULT;
     }
 
-    // Crear un material nuevo por cada primitiva de este mesh
     gltfMesh.primitives.forEach(prim => {
       const matIdx = gltf.materials.push({
         pbrMetallicRoughness: {
@@ -403,6 +388,126 @@ async function uploadToGitHub(arrayBuffer, filename) {
   }
   return await res.json();
 }
+
+// ─────────────────────────────────────────────────────────────
+// CARGAR GLB DESDE GITHUB
+// ─────────────────────────────────────────────────────────────
+async function loadFromGitHub(filename) {
+  const path = filename.endsWith('.glb') ? filename : filename + '.glb';
+  const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${path}`;
+
+  showToast('Descargando desde GitHub…');
+
+  const res = await fetch(apiUrl, {
+    headers: {
+      'Authorization': `Bearer ${GH_TOKEN}`,
+      'Accept': 'application/vnd.github.raw+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${res.status}`);
+  }
+
+  const buffer = await res.arrayBuffer();
+  loadGLBFromBuffer(buffer, true);
+  showToast(`✅ Cargado desde GitHub: ${path}`);
+}
+
+// Modal para elegir archivo de GitHub
+function askGitHubFile() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:9000;
+    display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);
+  `;
+  const box = document.createElement('div');
+  box.style.cssText = `
+    background:#1a1a1a;border:1px solid rgba(255,255,255,0.15);border-radius:12px;
+    padding:28px 24px;min-width:300px;font-family:'Courier New',monospace;color:#eee;
+    display:flex;flex-direction:column;gap:14px;
+  `;
+
+  const title = document.createElement('div');
+  title.textContent = 'Cargar desde GitHub';
+  title.style.cssText = 'font-size:13px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45);';
+
+  const input = document.createElement('input');
+  input.type = 'text'; input.placeholder = 'nombre del archivo (sin .glb)';
+  input.style.cssText = `
+    background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.2);
+    border-radius:6px;padding:10px 12px;color:#fff;font-size:15px;
+    font-family:'Courier New',monospace;outline:none;width:100%;
+    transition:border-color 0.2s;
+  `;
+  input.addEventListener('focus', () => input.select());
+
+  // Estado de verificación
+  const status = document.createElement('div');
+  status.style.cssText = `
+    font-size:12px;min-height:18px;padding:0 2px;
+    font-family:'Courier New',monospace;color:rgba(255,255,255,0.4);
+  `;
+
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;gap:10px;';
+
+  const cancel = makeDialogBtn('Cancelar', 'rgba(255,255,255,0.06)', '#aaa', 'rgba(255,255,255,0.12)');
+  const load   = makeDialogBtn('Cargar',   'rgba(60,140,255,0.18)', '#6ab0ff', 'rgba(60,140,255,0.35)');
+  load.disabled = true;
+  load.style.opacity = '0.4';
+
+  // Verificar existencia con debounce
+  let checkTimeout;
+  const checkExists = () => {
+    clearTimeout(checkTimeout);
+    const name = input.value.trim();
+    if (!name) {
+      status.textContent = '';
+      load.disabled = true; load.style.opacity = '0.4';
+      input.style.borderColor = 'rgba(255,255,255,0.2)';
+      return;
+    }
+    status.textContent = 'Verificando…';
+    checkTimeout = setTimeout(async () => {
+      const exists = await checkFileExists(name).catch(() => false);
+      if (exists) {
+        status.style.color = '#6fdc9a';
+        status.textContent = '✓ Archivo encontrado';
+        input.style.borderColor = 'rgba(80,200,120,0.5)';
+        load.disabled = false; load.style.opacity = '1';
+      } else {
+        status.style.color = '#ff7070';
+        status.textContent = '✗ Archivo no encontrado en el repo';
+        input.style.borderColor = 'rgba(255,80,80,0.4)';
+        load.disabled = true; load.style.opacity = '0.4';
+      }
+    }, 400);
+  };
+  input.addEventListener('input', checkExists);
+
+  const close = () => document.body.removeChild(overlay);
+  cancel.addEventListener('click', close);
+  load.addEventListener('click', () => {
+    const name = input.value.trim();
+    if (!name) return;
+    close();
+    loadFromGitHub(name).catch(e => showToast(`⚠️ Error: ${e.message}`, 5000));
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !load.disabled) load.click();
+    if (e.key === 'Escape') cancel.click();
+  });
+
+  row.append(cancel, load);
+  box.append(title, input, status, row);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  setTimeout(() => input.focus(), 50);
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // EXPORTAR GLB: parchear + subir a GitHub + descarga local
@@ -911,6 +1016,9 @@ function addBtn(icon, label, cb) {
 }
 
 // Archivo
+addLabel('GitHub');
+addBtn('☁️', 'Cargar desde GitHub', () => { closeMenu(); askGitHubFile(); });
+
 addLabel('Archivo');
 const loadInput = document.createElement('input');
 loadInput.type = 'file'; loadInput.accept = '.glb'; loadInput.id = 'load-glb-input';
@@ -1028,5 +1136,3 @@ window.addEventListener('touchstart', enableTouchMode, { once: true });
   controls.update();
   renderer.render(scene, camera);
 })();
-
-
