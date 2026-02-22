@@ -410,40 +410,49 @@ async function uploadToGitHub(arrayBuffer, filename) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// CARGAR GLB DESDE GITHUB
+// CARGAR GLB DESDE GITHUB (robusto)
 // ─────────────────────────────────────────────────────────────
 async function loadFromGitHub(filename) {
   const path = filename.endsWith('.glb') ? filename : filename + '.glb';
+  const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${path}`;
+
   showToast('Descargando desde GitHub…');
 
   try {
-    // Opción 1: usar el API de GitHub y decodificar base64 (funciona en repos privados)
-    const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${path}`;
     const res = await fetch(apiUrl, {
       headers: {
         'Authorization': `Bearer ${GH_TOKEN}`,
-        'Accept': 'application/vnd.github+json',
+        'Accept': 'application/vnd.github.raw+json',
         'X-GitHub-Api-Version': '2022-11-28'
       }
     });
+
+    console.log(`[GitHub] Status: ${res.status} (${res.statusText})`);
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.message || `HTTP ${res.status}`);
+      const errText = await res.text();
+      console.warn('[GitHub] Respuesta no OK:', errText);
+      showToast(`⚠️ Archivo no encontrado en GitHub: ${path}`, 5000);
+      return;
     }
 
-    const data = await res.json(); // JSON con base64
-    const buffer = Uint8Array.from(atob(data.content.replace(/\n/g, '')), c => c.charCodeAt(0)).buffer;
+    // Obtiene el ArrayBuffer
+    const buffer = await res.arrayBuffer();
+    console.log(`[GitHub] buffer.byteLength = ${buffer.byteLength}`);
 
-    // Cargar exactamente igual que local
+    if (buffer.byteLength === 0) {
+      showToast(`⚠️ GLB descargado vacío: ${path}`, 5000);
+      return;
+    }
+
+    // Pasa el buffer al loader local
     loadGLBFromBuffer(buffer, true);
     showToast(`✅ Cargado desde GitHub: ${path}`);
-  }
-  catch(err) {
+  } catch (err) {
+    console.error('[GitHub] Error descargando GLB:', err);
     showToast(`⚠️ Error cargando desde GitHub: ${err.message}`, 5000);
-    console.error(err);
   }
 }
-
 // Modal para elegir archivo de GitHub
 function askGitHubFile() {
   const overlay = document.createElement('div');
@@ -1160,4 +1169,5 @@ eyedropperBtn.addEventListener('click', () => {
   controls.update();
   renderer.render(scene, camera);
 })();
+
 
