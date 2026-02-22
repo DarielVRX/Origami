@@ -97,7 +97,25 @@ function setupModel(model) {
 
   model.traverse(child => {
     if (!child.isMesh) return;
-    child.material = baseMaterial.clone();
+
+    // Si el mesh ya tiene un material con color definido (GLB con colores exportados),
+    // conservarlo y solo asegurar emissive para hover/click.
+    // Si no tiene material o es el material por defecto sin color, asignar baseMaterial.
+    const hasMaterial = child.material &&
+      child.material.type === 'MeshStandardMaterial' &&
+      child.material.color;
+
+    if (hasMaterial) {
+      // Preservar color original, solo añadir emissive para interacción
+      child.material = child.material.clone();
+      child.material.emissive = new THREE.Color(0xffffff);
+      child.material.emissiveIntensity = 0;
+      // Registrar el color en meshColorMap para que futuras exportaciones lo conserven
+      meshColorMap.set(child.uuid, '#' + child.material.color.getHexString());
+    } else {
+      child.material = baseMaterial.clone();
+    }
+
     child.geometry.computeBoundingSphere();
     if (!child.geometry.attributes.normal) child.geometry.computeVertexNormals();
     uuidToMesh.set(child.uuid, child);
@@ -150,15 +168,18 @@ function loadGLBFromFile(file) {
 
 // Carga automática — usa GLTFLoader.load() en vez de fetch+parse
 // para que Three.js maneje correctamente la decodificación y el path base
+// Timestamp para evitar caché del navegador y CDN de GitHub Pages
+const _glbUrl = 'ModeloGLB.glb?v=' + Date.now();
+
 loader.load(
-  'ModeloGLB.glb',
+  _glbUrl,
   gltf => {
     if (glbModel) scene.remove(glbModel);
     glbModel = gltf.scene;
     lastHovered = lastClicked = null;
     setupModel(glbModel);
-    // Re-fetch para obtener el ArrayBuffer crudo (necesario para el export)
-    fetch('ModeloGLB.glb')
+    // Re-fetch del buffer crudo para el export (también sin caché)
+    fetch(_glbUrl, { cache: 'no-store' })
       .then(r => r.arrayBuffer())
       .then(buf => {
         const magic = new DataView(buf).getUint32(0, true);
@@ -432,7 +453,7 @@ function askGitHubFile() {
 
   const title = document.createElement('div');
   title.textContent = 'Cargar desde GitHub';
-  title.style.cssText = 'font-size:13px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45);';
+  title.style.cssText = 'font-size:20px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45);';
 
   const input = document.createElement('input');
   input.type = 'text'; input.placeholder = 'nombre del archivo (sin .glb)';
@@ -595,7 +616,7 @@ function showToast(msg, duration = 3000) {
   const t = document.createElement('div');
   t.textContent = msg;
   t.style.cssText = `
-    position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
+    position:fixed;bottom:160px;left:50%;transform:translateX(-50%);
     background:rgba(20,20,20,0.95);color:#fff;padding:12px 20px;
     border-radius:8px;font-family:'Courier New',monospace;font-size:13px;
     z-index:9999;border:1px solid rgba(255,255,255,0.15);
@@ -845,32 +866,32 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 
 .top-btn {
   position:fixed; top:12px; z-index:2000;
-  width:44px; height:44px;
+  width:132px; height:132px;
   background:rgba(20,20,20,0.85); border:1px solid rgba(255,255,255,0.15);
-  border-radius:8px; cursor:pointer;
+  border-radius:16px; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   backdrop-filter:blur(6px); transition:background 0.2s;
-  color:#fff; font-size:18px; user-select:none;
+  color:#fff; font-size:54px; user-select:none;
 }
 .top-btn:hover { background:rgba(40,40,40,0.95); }
 
 #hamburger-btn { left:12px; flex-direction:column; gap:5px; }
 #hamburger-btn span {
-  display:block; width:20px; height:2px;
+  display:block; width:60px; height:5px;
   background:#fff; border-radius:2px;
   transition:transform 0.25s, opacity 0.25s;
 }
-#hamburger-btn.open span:nth-child(1) { transform:translateY(7px) rotate(45deg); }
+#hamburger-btn.open span:nth-child(1) { transform:translateY(21px) rotate(45deg); }
 #hamburger-btn.open span:nth-child(2) { opacity:0; }
-#hamburger-btn.open span:nth-child(3) { transform:translateY(-7px) rotate(-45deg); }
+#hamburger-btn.open span:nth-child(3) { transform:translateY(-21px) rotate(-45deg); }
 
-#brush-toggle-btn { left:66px; }
+#brush-toggle-btn { left:154px; }
 
 #side-menu {
-  position:fixed; top:0; left:0; width:240px; height:100vh;
+  position:fixed; top:0; left:0; width:360px; height:100vh;
   background:rgba(18,18,18,0.96); backdrop-filter:blur(12px);
   z-index:1900; display:flex; flex-direction:column;
-  padding:70px 16px 24px; gap:10px;
+  padding:160px 16px 24px; gap:10px;
   transform:translateX(-100%);
   transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
   border-right:1px solid rgba(255,255,255,0.08);
@@ -879,12 +900,12 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 #side-menu.open { transform:translateX(0); }
 
 .menu-label {
-  font-family:'Courier New',monospace; font-size:10px;
+  font-family:'Courier New',monospace; font-size:14px;
   letter-spacing:2px; text-transform:uppercase;
   color:rgba(255,255,255,0.35); margin:8px 0 2px; padding-left:4px;
 }
 .menu-btn {
-  width:100%; padding:10px 14px;
+  width:100%; padding:20px 22px;
   background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
   border-radius:6px; color:#e8e8e8;
   font-family:'Courier New',monospace; font-size:13px;
@@ -898,20 +919,20 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 label.menu-btn  { user-select:none; }
 
 #brush-panel {
-  position:fixed; top:66px; left:12px; z-index:1800;
+  position:fixed; top:160px; left:12px; z-index:1800;
   background:rgba(18,18,18,0.92); border:1px solid rgba(255,255,255,0.1);
   border-radius:10px; padding:14px 18px;
   display:none; flex-direction:column; gap:10px;
-  backdrop-filter:blur(8px); min-width:220px;
+  backdrop-filter:blur(8px); min-width:320px;
 }
 #brush-panel.visible { display:flex; }
 #brush-panel label {
-  font-family:'Courier New',monospace; font-size:11px;
+  font-family:'Courier New',monospace; font-size:16px;
   letter-spacing:1px; color:rgba(255,255,255,0.5); text-transform:uppercase;
 }
 #brush-panel input[type=range] { width:100%; accent-color:#ff4444; }
 #brush-size-display {
-  font-family:'Courier New',monospace; font-size:12px;
+  font-family:'Courier New',monospace; font-size:18px;
   color:rgba(255,255,255,0.55); text-align:right;
 }
 
@@ -925,7 +946,7 @@ label.menu-btn  { user-select:none; }
   display:flex; flex-direction:column; align-items:flex-end; gap:6px;
 }
 #current-color-btn {
-  width:44px; height:44px; border-radius:8px;
+  width:132px; height:132px; border-radius:16px;
   border:2px solid rgba(255,255,255,0.3); cursor:pointer;
   box-shadow:0 2px 12px rgba(0,0,0,0.4); transition:transform 0.15s;
 }
@@ -934,7 +955,7 @@ label.menu-btn  { user-select:none; }
 #palette-div {
   display:none; background:rgba(18,18,18,0.95);
   border:1px solid rgba(255,255,255,0.1); border-radius:10px;
-  padding:10px; grid-template-columns:repeat(6,1fr); gap:5px;
+  padding:14px; grid-template-columns:repeat(6,1fr); gap:8px;
   max-height:60vh; overflow-y:auto; backdrop-filter:blur(10px);
 }
 #palette-div.visible { display:grid; }
@@ -943,7 +964,7 @@ label.menu-btn  { user-select:none; }
   grid-column:span 6; padding:8px;
   background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15);
   border-radius:6px; color:#ccc;
-  font-family:'Courier New',monospace; font-size:12px; cursor:pointer;
+  font-family:'Courier New',monospace; font-size:18px; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   gap:6px; letter-spacing:1px; text-transform:uppercase;
   transition:background 0.15s, border-color 0.15s, color 0.15s;
@@ -952,11 +973,17 @@ label.menu-btn  { user-select:none; }
 #eyedropper-btn.active { background:rgba(255,220,80,0.25); border-color:#ffd84f; color:#ffd84f; }
 
 .color-swatch {
-  width:26px; height:26px; border-radius:5px; cursor:pointer;
+  width:52px; height:52px; border-radius:8px; cursor:pointer;
   border:1px solid rgba(255,255,255,0.05);
   transition:transform 0.1s, outline 0.1s;
 }
 .color-swatch:hover { transform:scale(1.2); outline:2px solid #ffd84f; }
+
+body.eyedropper-cursor * { cursor:crosshair !important; }
+
+body.eyedropper-cursor * { cursor:crosshair !important; }
+
+body.eyedropper-cursor * { cursor:crosshair !important; }
 
 body.eyedropper-cursor * { cursor:crosshair !important; }
 
@@ -1117,16 +1144,6 @@ eyedropperBtn.addEventListener('click', () => {
   });
   paletteDiv.appendChild(sw);
 });
-
-// ─────────────────────────────────────────────────────────────
-// DETECCIÓN DE TOUCH — aplica clase is-touch al body
-// Se activa en el primer evento touch y permanece para toda la sesión
-// ─────────────────────────────────────────────────────────────
-function enableTouchMode() {
-  document.body.classList.add('is-touch');
-  window.removeEventListener('touchstart', enableTouchMode);
-}
-window.addEventListener('touchstart', enableTouchMode, { once: true });
 
 // ─────────────────────────────────────────────────────────────
 // LOOP
