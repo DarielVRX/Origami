@@ -318,7 +318,6 @@ function onMouseMove(event){
   }
 }
 
-// ================= ON MOUSE DOWN =================
 function onMouseDown(event){
   if(!glbModel) return;
 
@@ -347,7 +346,7 @@ function onMouseDown(event){
 
     // Eliminar outline previo si existe
     if(lastClickedOutline){
-      scene.remove(lastClickedOutline);
+      clickedObj.remove(lastClickedOutline); // ahora se parenta al objeto
       lastClickedOutline.geometry.dispose();
       lastClickedOutline.material.dispose();
       lastClickedOutline = null;
@@ -355,16 +354,16 @@ function onMouseDown(event){
 
     lastClickedObject = clickedObj;
 
-    // Crear outline de bordes
+    // Crear outline de bordes correctamente
     const edges = new THREE.EdgesGeometry(clickedObj.geometry);
     const line = new THREE.LineSegments(
       edges,
       new THREE.LineBasicMaterial({ color: 0xffffaa, linewidth: 2 })
     );
-    line.position.copy(clickedObj.position);
-    line.rotation.copy(clickedObj.rotation);
-    line.scale.copy(clickedObj.scale);
-    scene.add(line);
+    line.position.set(0,0,0);
+    line.rotation.set(0,0,0);
+    line.scale.set(1,1,1);
+    clickedObj.add(line); // se parenta al mesh
     lastClickedOutline = line;
 
     onMouseMove(event);
@@ -466,3 +465,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
