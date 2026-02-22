@@ -98,30 +98,21 @@ function setupModel(model) {
   model.traverse(child => {
     if (!child.isMesh) return;
 
-    // Detectar si el GLB traía colores reales exportados por nosotros:
-    // un color "real" tiene baseColorFactor distinto del gris por defecto de Three.js
-    // que es (1,1,1). Si el color es exactamente blanco puro, es el default — reemplazar.
-    const mat = child.material;
-    const isDefaultWhite = mat && mat.color &&
-      Math.abs(mat.color.r - 1) < 0.01 &&
-      Math.abs(mat.color.g - 1) < 0.01 &&
-      Math.abs(mat.color.b - 1) < 0.01;
+    // Leer color existente ANTES de reemplazar el material
+    // (puede ser un color exportado por nosotros via baseColorFactor)
+    const existingColor = child.material?.color;
+    const isCustomColor = existingColor &&
+      !(Math.abs(existingColor.r - 1) < 0.01 && Math.abs(existingColor.g - 1) < 0.01 && Math.abs(existingColor.b - 1) < 0.01) &&
+      !(Math.abs(existingColor.r - 0.8) < 0.05 && Math.abs(existingColor.g - 0.8) < 0.05 && Math.abs(existingColor.b - 0.8) < 0.05) &&
+      !(Math.abs(existingColor.r - 0.667) < 0.05 && Math.abs(existingColor.g - 0.667) < 0.05 && Math.abs(existingColor.b - 0.667) < 0.05);
 
-    const isDefaultGray = mat && mat.color &&
-      Math.abs(mat.color.r - 0.8) < 0.05 &&
-      Math.abs(mat.color.g - 0.8) < 0.05 &&
-      Math.abs(mat.color.b - 0.8) < 0.05;
+    // Siempre usar baseMaterial para garantizar compatibilidad con Three.js r163
+    child.material = baseMaterial.clone();
 
-    if (!mat || isDefaultWhite || isDefaultGray) {
-      // Sin material real — asignar base gris con emissive listo
-      child.material = baseMaterial.clone();
-    } else {
-      // Color real exportado — preservarlo y añadir emissive para interacción
-      child.material = mat.clone();
-      child.material.emissive = new THREE.Color(0xffffff);
-      child.material.emissiveIntensity = 0;
-      // Registrar en meshColorMap para que re-exports lo conserven
-      meshColorMap.set(child.uuid, '#' + child.material.color.getHexString());
+    if (isCustomColor) {
+      // Restaurar color exportado en el nuevo material compatible
+      child.material.color.copy(existingColor);
+      meshColorMap.set(child.uuid, '#' + existingColor.getHexString());
     }
 
     child.geometry.computeBoundingSphere();
