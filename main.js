@@ -98,22 +98,30 @@ function setupModel(model) {
   model.traverse(child => {
     if (!child.isMesh) return;
 
-    // Si el mesh ya tiene un material con color definido (GLB con colores exportados),
-    // conservarlo y solo asegurar emissive para hover/click.
-    // Si no tiene material o es el material por defecto sin color, asignar baseMaterial.
-    const hasMaterial = child.material &&
-      child.material.type === 'MeshStandardMaterial' &&
-      child.material.color;
+    // Detectar si el GLB traía colores reales exportados por nosotros:
+    // un color "real" tiene baseColorFactor distinto del gris por defecto de Three.js
+    // que es (1,1,1). Si el color es exactamente blanco puro, es el default — reemplazar.
+    const mat = child.material;
+    const isDefaultWhite = mat && mat.color &&
+      Math.abs(mat.color.r - 1) < 0.01 &&
+      Math.abs(mat.color.g - 1) < 0.01 &&
+      Math.abs(mat.color.b - 1) < 0.01;
 
-    if (hasMaterial) {
-      // Preservar color original, solo añadir emissive para interacción
-      child.material = child.material.clone();
+    const isDefaultGray = mat && mat.color &&
+      Math.abs(mat.color.r - 0.8) < 0.05 &&
+      Math.abs(mat.color.g - 0.8) < 0.05 &&
+      Math.abs(mat.color.b - 0.8) < 0.05;
+
+    if (!mat || isDefaultWhite || isDefaultGray) {
+      // Sin material real — asignar base gris con emissive listo
+      child.material = baseMaterial.clone();
+    } else {
+      // Color real exportado — preservarlo y añadir emissive para interacción
+      child.material = mat.clone();
       child.material.emissive = new THREE.Color(0xffffff);
       child.material.emissiveIntensity = 0;
-      // Registrar el color en meshColorMap para que futuras exportaciones lo conserven
+      // Registrar en meshColorMap para que re-exports lo conserven
       meshColorMap.set(child.uuid, '#' + child.material.color.getHexString());
-    } else {
-      child.material = baseMaterial.clone();
     }
 
     child.geometry.computeBoundingSphere();
