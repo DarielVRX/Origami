@@ -76,7 +76,7 @@ function hslToHex(h,s,l){
   s/=100;l/=100;
   const k=n=>(n+h/30)%12;
   const a=s*Math.min(l,1-l);
-  const f=n=>{ const val=l - a * Math.max(Math.min(k(n)-3,9-k(n),1),-1); return Math.round(255*val).toString(16).padStart(2,'0'); };
+  const f=n=>{ const val=l - Math.max(Math.min(k(n)-3,9-k(n),1),-1)*a; return Math.round(255*val).toString(16).padStart(2,'0'); };
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
@@ -136,135 +136,128 @@ colors.forEach(color=>{
   btn.title=color;
   btn.addEventListener('mouseenter',()=>btn.style.outline='2px solid yellow');
   btn.addEventListener('mouseleave',()=>btn.style.outline='none');
-  btn.addEventListener('click',()=>{ currentColor=color; currentColorBtn.style.background=color; paletteDiv.style.display='none'; });
+  btn.addEventListener('click',()=>{
+    currentColor=color;
+    currentColorBtn.style.background=color;
+    paletteDiv.style.display='none';
+  });
   paletteDiv.appendChild(btn);
 });
 
-// ===================== SLIDER PUNTERO COLAPSABLE =====================
-const sliderContainer = document.createElement('div');
-sliderContainer.style.position='fixed';
-sliderContainer.style.top='20px';
-sliderContainer.style.left='50%';
-sliderContainer.style.transform='translateX(-50%)';
-sliderContainer.style.zIndex=1000;
-sliderContainer.style.width='200px';
-sliderContainer.style.height='20px';
-sliderContainer.style.background='#ccc';
-sliderContainer.style.borderRadius='10px';
-sliderContainer.style.cursor='pointer';
-sliderContainer.style.display='flex';
-sliderContainer.style.alignItems='center';
-sliderContainer.style.justifyContent='center';
-document.body.appendChild(sliderContainer);
-
-const sliderPoint = document.createElement('div');
-sliderPoint.style.width='12px';
-sliderPoint.style.height='12px';
-sliderPoint.style.background='red';
-sliderPoint.style.borderRadius='50%';
-sliderPoint.style.position='absolute';
-sliderPoint.style.left='50%';
-sliderPoint.style.transform='translateX(-50%)';
-sliderContainer.appendChild(sliderPoint);
-
+// ===================== SLIDER PUNTERO =====================
 const brushSlider = document.createElement('input');
 brushSlider.type='range';
 brushSlider.min='1';
 brushSlider.max='10';
 brushSlider.value='1';
-brushSlider.style.position='absolute';
-brushSlider.style.top='30px';
-brushSlider.style.left='50%';
-brushSlider.style.transform='translateX(-50%)';
-brushSlider.style.width='300px';
 brushSlider.style.display='none';
-brushSlider.style.zIndex=1001;
+brushSlider.style.zIndex=1000;
+brushSlider.style.position='fixed';
+brushSlider.style.top='70px';
+brushSlider.style.left='20px';
+brushSlider.style.width='40px';
 document.body.appendChild(brushSlider);
 
-sliderContainer.addEventListener('click',()=>{
-  brushSlider.style.display='block';
-});
-brushSlider.addEventListener('change',()=>{
+const brushCircle = document.createElement('div');
+brushCircle.style.position='fixed';
+brushCircle.style.border='2px solid red';
+brushCircle.style.borderRadius='50%';
+brushCircle.style.pointerEvents='none';
+brushCircle.style.width=brushSize*10+'px';
+brushCircle.style.height=brushSize*10+'px';
+brushCircle.style.transition='opacity 0.3s';
+document.body.appendChild(brushCircle);
+
+brushSlider.addEventListener('input',()=>{
   brushSize=parseFloat(brushSlider.value);
   brushCircle.style.width=brushSize*10+'px';
   brushCircle.style.height=brushSize*10+'px';
-  brushSlider.style.display='none';
 });
 
-// ===================== TEXTO DE ARCHIVO =====================
-const fileLabel = document.createElement('div');
-fileLabel.style.position='fixed';
-fileLabel.style.top='70px';
-fileLabel.style.left='50%';
-fileLabel.style.transform='translateX(-50%)';
-fileLabel.style.padding='5px 10px';
-fileLabel.style.border='2px solid #444';
-fileLabel.style.borderRadius='6px';
-fileLabel.style.background='rgba(255,255,255,0.9)';
-fileLabel.style.zIndex=1000;
-fileLabel.style.fontFamily='sans-serif';
-fileLabel.style.fontSize='0.9em';
-fileLabel.textContent='No se ha seleccionado';
-document.body.appendChild(fileLabel);
+brushSlider.addEventListener('mouseup',()=>brushSlider.style.display='none');
 
-// ===================== BOTÓN CARGA ARCHIVO =====================
-const fileInput = document.createElement('input');
-fileInput.type='file';
-fileInput.accept='.glb,.gltf';
-fileInput.style.display='none';
-document.body.appendChild(fileInput);
-
-const menuBtn = document.createElement('button');
+// ===================== MENÚ HAMBURGUESA =====================
+const menuBtn = document.createElement('div');
 menuBtn.textContent='☰';
 menuBtn.style.position='fixed';
-menuBtn.style.bottom='10px';
-menuBtn.style.left='10px';
-menuBtn.style.padding='10px';
-menuBtn.style.fontSize='1.2em';
+menuBtn.style.top='20px';
+menuBtn.style.left='20px';
+menuBtn.style.width='40px';
+menuBtn.style.height='40px';
+menuBtn.style.background='#fff';
+menuBtn.style.border='2px solid #000';
+menuBtn.style.display='flex';
+menuBtn.style.alignItems='center';
+menuBtn.style.justifyContent='center';
 menuBtn.style.cursor='pointer';
 menuBtn.style.zIndex=1000;
 document.body.appendChild(menuBtn);
 
-const menuContainer = document.createElement('div');
-menuContainer.style.position='fixed';
-menuContainer.style.bottom='50px';
-menuContainer.style.left='10px';
-menuContainer.style.padding='5px';
-menuContainer.style.background='rgba(255,255,255,0.95)';
-menuContainer.style.border='1px solid #000';
-menuContainer.style.borderRadius='6px';
-menuContainer.style.display='none';
-menuContainer.style.flexDirection='column';
-menuContainer.style.gap='5px';
-menuContainer.style.zIndex=1000;
-document.body.appendChild(menuContainer);
+const menuDiv = document.createElement('div');
+menuDiv.style.position='fixed';
+menuDiv.style.top='70px';
+menuDiv.style.left='20px';
+menuDiv.style.background='rgba(255,255,255,0.95)';
+menuDiv.style.border='2px solid #000';
+menuDiv.style.display='none';
+menuDiv.style.flexDirection='column';
+menuDiv.style.padding='5px';
+menuDiv.style.zIndex=1000;
+document.body.appendChild(menuDiv);
 
-menuBtn.addEventListener('click',()=>menuContainer.style.display = menuContainer.style.display==='none'?'flex':'none');
+function closeMenu(){ menuDiv.style.display='none'; }
 
-// Botones internos del menú
+const fileInput = document.createElement('input');
+fileInput.type='file';
+fileInput.accept='.glb';
+fileInput.style.display='none';
+fileInput.addEventListener('change', (e)=>{
+  if(e.target.files.length>0){
+    const file = e.target.files[0];
+    loadGLBFile(file);
+    fileNameDiv.textContent = file.name;
+  }
+});
+
+[ 
+  {text:'Exportar Imagen 2x2', action:()=>exportImgBtn.click()},
+  {text:'Exportar GLB', action:()=>exportGLB()},
+  {text:'Bloquear Cámara', action:()=>{
+    cameraLocked=!cameraLocked; controls.enableRotate=!cameraLocked; cameraLockBtn.textContent=cameraLocked?"Desbloquear Cámara":"Bloquear Cámara";
+  }},
+  {text:'Cargar GLB', action:()=>fileInput.click()}
+].forEach(opt=>{
+  const btn=document.createElement('button');
+  btn.textContent=opt.text;
+  btn.style.margin='2px 0';
+  btn.style.cursor='pointer';
+  btn.addEventListener('click',()=>{
+    opt.action();
+    closeMenu();
+  });
+  menuDiv.appendChild(btn);
+});
+
+menuBtn.addEventListener('click',()=>menuDiv.style.display=menuDiv.style.display==='none'?'flex':'none');
+
+// ===================== TEXTO ARCHIVO SELECCIONADO =====================
+const fileNameDiv = document.createElement('div');
+fileNameDiv.style.position='fixed';
+fileNameDiv.style.top='120px';
+fileNameDiv.style.left='50%';
+fileNameDiv.style.transform='translateX(-50%)';
+fileNameDiv.style.padding='5px 10px';
+fileNameDiv.style.border='2px solid #000';
+fileNameDiv.style.background='rgba(255,255,255,0.95)';
+fileNameDiv.style.zIndex=1000;
+fileNameDiv.textContent='No se ha seleccionado';
+document.body.appendChild(fileNameDiv);
+
+// ===================== EXPORTAR IMAGEN 2x2 =====================
 const exportImgBtn = document.createElement('button');
 exportImgBtn.textContent="Exportar Imagen 2x2";
-const exportGLBBtn = document.createElement('button');
-exportGLBBtn.textContent="Exportar GLB";
-const cameraLockBtn = document.createElement('button');
-cameraLockBtn.textContent="Bloquear Cámara";
-const loadModelBtn = document.createElement('button');
-loadModelBtn.textContent="Cargar Modelo";
-
-[exportImgBtn, exportGLBBtn, cameraLockBtn, loadModelBtn].forEach(b=>{
-  b.style.padding='5px';
-  b.style.fontSize='0.9em';
-  b.style.cursor='pointer';
-  menuContainer.appendChild(b);
-});
-
-// ===================== FUNCIONALIDADES MENU =====================
-let cameraLocked=false;
-cameraLockBtn.addEventListener('click',()=>{
-  cameraLocked=!cameraLocked;
-  controls.enableRotate=!cameraLocked;
-  cameraLockBtn.textContent=cameraLocked?"Desbloquear Cámara":"Bloquear Cámara";
-});
+exportImgBtn.style.display='none';
+document.body.appendChild(exportImgBtn);
 
 exportImgBtn.addEventListener('click',()=>{
   if(!glbModel) return alert("No hay modelo cargado");
@@ -301,26 +294,54 @@ exportImgBtn.addEventListener('click',()=>{
   },500);
 });
 
+// ===================== BOTÓN BLOQUEO =====================
+const cameraLockBtn=document.createElement('button');
+cameraLockBtn.textContent="Bloquear Cámara";
+cameraLockBtn.style.display='none';
+document.body.appendChild(cameraLockBtn);
+
+// ===================== FUNCIONES GLB =====================
+function loadGLBFile(file){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    loader.parse(e.target.result, '', (gltf)=>{
+      if(glbModel) scene.remove(glbModel);
+      glbModel = gltf.scene;
+      glbModel.scale.set(0.5,0.5,0.5);
+      glbModel.position.set(0,0,0);
+      glbModel.traverse(child=>{
+        if(child.isMesh){
+          child.material = baseMaterial.clone();
+          child.userData.originalMaterial = child.material.clone();
+          child.geometry.computeBoundingSphere();
+        }
+      });
+      scene.add(glbModel);
+      const box = new THREE.Box3().setFromObject(glbModel);
+      const center = box.getCenter(new THREE.Vector3());
+      controls.target.copy(center);
+      controls.update();
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
 
 // ===================== EXPORTAR GLB FUNCIONAL =====================
 function exportGLB(){
   if(!glbModel) return alert("No hay modelo cargado");
-
-  // Actualizar materiales con colores seleccionados
   glbModel.traverse(child=>{
     if(child.isMesh){
       child.material = child.userData.originalMaterial.clone();
       if(child.userData.currentColor) child.material.color.copy(child.userData.currentColor);
     }
   });
-
   const exporter = new GLTFExporter();
   exporter.parse(glbModel, function(result){
     let blob;
     if(result instanceof ArrayBuffer){
       blob = new Blob([result], {type:'model/gltf-binary'});
     } else {
-      const output = JSON.stringify(result, null, 2);
+      const output = JSON.stringify(result,null,2);
       blob = new Blob([output], {type:'application/json'});
     }
     const link = document.createElement('a');
@@ -330,33 +351,12 @@ function exportGLB(){
   }, {binary:true});
 }
 
-loadModelBtn.addEventListener('click',()=>fileInput.click());
-fileInput.addEventListener('change',e=>{
-  const file = e.target.files[0];
-  if(!file) return;
-  const url = URL.createObjectURL(file);
-  loader.load(url, (gltf)=>{
-    if(glbModel) scene.remove(glbModel);
-    glbModel = gltf.scene;
-    glbModel.scale.set(0.5,0.5,0.5);
-    glbModel.position.set(0,0,0);
-    glbModel.traverse(child=>{
-      if(child.isMesh){
-        child.material = baseMaterial.clone();
-        child.userData.originalMaterial = child.material.clone();
-        child.geometry.computeBoundingSphere();
-      }
-    });
-    scene.add(glbModel);
-    const box = new THREE.Box3().setFromObject(glbModel);
-    const center = box.getCenter(new THREE.Vector3());
-    controls.target.copy(center);
-    controls.update();
-  });
-  fileLabel.textContent=file.name;
-});
+// ===================== INTERACCIONES =====================
+renderer.domElement.addEventListener('mousemove',onMouseMove);
+renderer.domElement.addEventListener('mousedown',onMouseDown);
+renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 
-// ===================== GOTERO =====================
 const eyedropperBtn = document.createElement('div');
 eyedropperBtn.style.width='30px';
 eyedropperBtn.style.height='30px';
@@ -373,22 +373,7 @@ eyedropperBtn.addEventListener('click',()=>{
   eyedropperBtn.style.boxShadow = eyedropperActive?'0 0 8px 2px yellow':'none';
 });
 
-// ===================== INTERACCIONES =====================
-const brushCircle = document.createElement('div');
-brushCircle.style.position='fixed';
-brushCircle.style.border='2px solid red';
-brushCircle.style.borderRadius='50%';
-brushCircle.style.pointerEvents='none';
-brushCircle.style.width=brushSize*10+'px';
-brushCircle.style.height=brushSize*10+'px';
-brushCircle.style.transition='opacity 0.3s';
-document.body.appendChild(brushCircle);
-
-renderer.domElement.addEventListener('mousemove',onMouseMove);
-renderer.domElement.addEventListener('mousedown',onMouseDown);
-renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
-renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
-
+// ===================== INTERACCIONES PRINCIPALES =====================
 function handleHoverAndPaint(intersects){
   if(intersects.length===0){
     if(glbModel) glbModel.traverse(child=>{ if(child.isMesh && child!==lastClickedObject) child.material.emissiveIntensity=0; });
@@ -399,7 +384,7 @@ function handleHoverAndPaint(intersects){
   glbModel.traverse(child=>{
     if(child.isMesh){
       let shouldHighlight=false;
-      if(brushSize<=parseFloat(brushSlider.min)) shouldHighlight=(child===hoveredObject);
+      if(brushSize<=1) shouldHighlight=(child===hoveredObject);
       else{
         const pos=child.geometry.attributes.position;
         for(let i=0;i<pos.count;i++){
@@ -413,10 +398,11 @@ function handleHoverAndPaint(intersects){
       }
     }
   });
+
   if(isDrawing && hoveredObject){
-    if(brushSize<=parseFloat(brushSlider.min)){
+    if(brushSize<=1){
       hoveredObject.material.color.set(currentColor);
-      hoveredObject.userData.currentColor=hoveredObject.material.color.clone();
+      hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
       if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
     } else{
       glbModel.traverse(child=>{
@@ -487,4 +473,3 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
-
