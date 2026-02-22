@@ -5,7 +5,7 @@ import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/cont
 // ─────────────────────────────────────────────────────────────
 // GITHUB CONFIG  ← reemplaza si regeneras el token
 // ─────────────────────────────────────────────────────────────
-const GH_TOKEN = ['github_pat_', '11B6UPSYA0qs', '8ym9xkEeVn_y', 'NbKkbSqUl7RC', 'VvX9cDV7xjOu', 'F8sU9FFZQKLw', 'UbNAyyEENGEG', 'VYIMjyaEV6'].join('');
+const GH_TOKEN  = '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';
 const GH_REPO   = 'darielvrx/Origami';
 const GH_BRANCH = 'main';
 
@@ -345,7 +345,7 @@ function buildPatchedGLB() {
     outBytes.fill(0x00, off, off + binPad);    off += binPad;
   }
 
-  console.log(`GLB parcheado: ${totalLength.toLocaleString()} bytes, ${patchedMats.size} materiales modificados`);
+  console.log(`GLB parcheado: ${totalLength.toLocaleString()} bytes, ${patchedCount} materiales con color personalizado`);
   return out;
 }
 
@@ -501,6 +501,21 @@ function showToast(msg, duration = 3000) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// VERIFICAR SI ARCHIVO EXISTE EN GITHUB
+// ─────────────────────────────────────────────────────────────
+async function checkFileExists(filename) {
+  const path = filename.endsWith('.glb') ? filename : filename + '.glb';
+  const res = await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${path}`, {
+    headers: {
+      'Authorization': `Bearer ${GH_TOKEN}`,
+      'Accept': 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28'
+    }
+  });
+  return res.ok; // 200 = existe, 404 = no existe
+}
+
+// ─────────────────────────────────────────────────────────────
 // MODAL DE NOMBRE DE ARCHIVO
 // ─────────────────────────────────────────────────────────────
 function askFilename(defaultName, onConfirm) {
@@ -515,6 +530,7 @@ function askFilename(defaultName, onConfirm) {
     padding:28px 24px;min-width:300px;font-family:'Courier New',monospace;color:#eee;
     display:flex;flex-direction:column;gap:14px;
   `;
+
   const title = document.createElement('div');
   title.textContent = 'Nombre del archivo';
   title.style.cssText = 'font-size:13px;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.45);';
@@ -525,14 +541,40 @@ function askFilename(defaultName, onConfirm) {
     background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.2);
     border-radius:6px;padding:10px 12px;color:#fff;font-size:15px;
     font-family:'Courier New',monospace;outline:none;width:100%;
+    transition:border-color 0.2s;
   `;
   input.addEventListener('focus', () => input.select());
+
+  // Aviso de sobreescritura — oculto por defecto
+  const warning = document.createElement('div');
+  warning.style.cssText = `
+    display:none;padding:9px 12px;border-radius:6px;
+    background:rgba(255,160,0,0.12);border:1px solid rgba(255,160,0,0.35);
+    color:#ffb347;font-size:12px;line-height:1.5;
+  `;
+  warning.innerHTML = '⚠️ <strong>Este archivo ya existe en GitHub.</strong><br>Si continúas, será sobreescrito. El historial de Git conserva la versión anterior.';
 
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;gap:10px;';
 
   const cancel  = makeDialogBtn('Cancelar', 'rgba(255,255,255,0.06)', '#aaa', 'rgba(255,255,255,0.12)');
   const confirm = makeDialogBtn('Guardar',  'rgba(80,200,120,0.18)', '#6fdc9a', 'rgba(80,200,120,0.35)');
+
+  // Verificar existencia cada vez que el input cambia (con debounce)
+  let checkTimeout;
+  const checkExists = () => {
+    clearTimeout(checkTimeout);
+    const name = input.value.trim();
+    if (!name) { warning.style.display = 'none'; return; }
+    checkTimeout = setTimeout(async () => {
+      const exists = await checkFileExists(name).catch(() => false);
+      warning.style.display = exists ? 'block' : 'none';
+      // Borde naranja si existe
+      input.style.borderColor = exists ? 'rgba(255,160,0,0.5)' : 'rgba(255,255,255,0.2)';
+      confirm.textContent = exists ? 'Sobreescribir' : 'Guardar';
+    }, 400); // espera 400ms tras dejar de escribir
+  };
+  input.addEventListener('input', checkExists);
 
   const close = () => document.body.removeChild(overlay);
   cancel.addEventListener('click', close);
@@ -543,12 +585,11 @@ function askFilename(defaultName, onConfirm) {
   });
 
   row.append(cancel, confirm);
-  box.append(title, input, row);
+  box.append(title, input, warning, row);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
-  setTimeout(() => input.focus(), 50);
+  setTimeout(() => { input.focus(); checkExists(); }, 50);
 }
-
 function makeDialogBtn(text, bg, color, hoverBg) {
   const btn = document.createElement('button');
   btn.textContent = text;
@@ -986,4 +1027,3 @@ window.addEventListener('touchstart', enableTouchMode, { once: true });
   controls.update();
   renderer.render(scene, camera);
 })();
-
