@@ -5,7 +5,7 @@ import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/cont
 // ─────────────────────────────────────────────────────────────
 // GITHUB CONFIG  ← reemplaza si regeneras el token
 // ─────────────────────────────────────────────────────────────
-const GH_TOKEN  = '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';
+const GH_TOKEN  = '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';
 const GH_REPO   = 'darielvrx/Origami';
 const GH_BRANCH = 'main';
 
@@ -248,8 +248,12 @@ function buildPatchedGLB() {
     }
   }
 
-  // ── Parchear materiales con colores pintados ──
-  // Correlacionar meshes Three.js (DFS) con nodos GLTF (DFS)
+  // ── Construir materiales desde cero ──
+  // El GLB original no tiene materiales (solo geometría pura).
+  // Creamos un material por mesh: color pintado si existe, gris base si no.
+  // Cada primitiva recibe su propio índice de material para independencia total.
+
+  // Recopilar meshes GLTF en orden DFS (igual que Three.js traverse)
   const meshNodes = [];
   if (gltf.nodes && gltf.scenes) {
     const visitNode = idx => {
@@ -265,42 +269,46 @@ function buildPatchedGLB() {
   const threeMeshes = [];
   if (glbModel) glbModel.traverse(c => { if (c.isMesh) threeMeshes.push(c); });
 
-  // Materiales compartidos: clonar antes de modificar para no afectar otros meshes
-  const patchedMats = new Set();
+  // Inicializar array de materiales vacío
+  gltf.materials = [];
+
+  const DEFAULT = [0.6, 0.6, 0.6, 1.0]; // gris base en linear space
+
+  let patchedCount = 0;
+
   meshNodes.forEach((meshIdx, i) => {
-    const threeMesh = threeMeshes[i];
-    if (!threeMesh) return;
-    const hex = meshColorMap.get(threeMesh.uuid);
-    if (!hex) return;
-
-    const c = new THREE.Color(hex);
-    // Three.js convierte sRGB→linear internamente; aquí trabajamos en linear
-    const r = Math.pow(c.r, 2.2);
-    const g = Math.pow(c.g, 2.2);
-    const b = Math.pow(c.b, 2.2);
-
     const gltfMesh = gltf.meshes?.[meshIdx];
     if (!gltfMesh) return;
+
+    const threeMesh = threeMeshes[i];
+    const hex = threeMesh ? meshColorMap.get(threeMesh.uuid) : undefined;
+
+    let baseColorFactor;
+    if (hex) {
+      const c = new THREE.Color(hex);
+      // sRGB → linear (gamma 2.2)
+      baseColorFactor = [
+        Math.pow(c.r, 2.2),
+        Math.pow(c.g, 2.2),
+        Math.pow(c.b, 2.2),
+        1.0
+      ];
+      patchedCount++;
+    } else {
+      baseColorFactor = DEFAULT;
+    }
+
+    // Crear un material nuevo por cada primitiva de este mesh
     gltfMesh.primitives.forEach(prim => {
-      let matIdx = prim.material;
-      // Si el material ya fue parcheado por otro mesh, crear una copia
-      if (matIdx !== undefined && patchedMats.has(matIdx)) {
-        const copy = JSON.parse(JSON.stringify(gltf.materials[matIdx]));
-        matIdx = gltf.materials.push(copy) - 1;
-        prim.material = matIdx;
-      }
-      if (matIdx === undefined) {
-        // Primitiva sin material: crear uno nuevo
-        if (!gltf.materials) gltf.materials = [];
-        matIdx = gltf.materials.push({ pbrMetallicRoughness: {} }) - 1;
-        prim.material = matIdx;
-      }
-      const mat = gltf.materials[matIdx];
-      if (!mat.pbrMetallicRoughness) mat.pbrMetallicRoughness = {};
-      mat.pbrMetallicRoughness.baseColorFactor = [r, g, b, 1.0];
-      // Eliminar baseColorTexture para que el color sólido tome efecto
-      delete mat.pbrMetallicRoughness.baseColorTexture;
-      patchedMats.add(matIdx);
+      const matIdx = gltf.materials.push({
+        pbrMetallicRoughness: {
+          baseColorFactor,
+          metallicFactor:  0.0,
+          roughnessFactor: 0.8
+        },
+        doubleSided: true
+      }) - 1;
+      prim.material = matIdx;
     });
   });
 
@@ -978,4 +986,3 @@ window.addEventListener('touchstart', enableTouchMode, { once: true });
   controls.update();
   renderer.render(scene, camera);
 })();
-
