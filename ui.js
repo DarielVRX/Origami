@@ -1,181 +1,110 @@
-// ─────────────────────────────────────────────────────────────
-// ui.js — FAB group, drawer lateral, paleta, modales, toast
-// Dependencias: github.js, model.js, export.js, paint.js
-// ─────────────────────────────────────────────────────────────
+export function buildUI({ onCameraLockChange }) {
 
-import { checkFileExists } from './github.js';
-import { loadGLBFromFile, loadGLBFromGitHub }  from './model.js';
-import { doExportGLB, doExportImage }           from './export.js';
-import {
-  setCurrentColor, setBrushSize, setEyedropperActive,
-  eyedropperActive
-} from './paint.js';
+  // ─────────────────────────────
+  // Brush visual
+  // ─────────────────────────────
+  const brushCircle = document.createElement('div');
+  brushCircle.id = 'brush-circle';
+  Object.assign(brushCircle.style, {
+    position: 'fixed',
+    width: '20px',
+    height: '20px',
+    borderRadius: '50%',
+    border: '2px solid white',
+    pointerEvents: 'none',
+    display: 'none',
+    zIndex: '9999',
+    transform: 'translate(-50%, -50%)'
+  });
+  document.body.appendChild(brushCircle);
 
-/*  TODO EL BLOQUE DE ESTILOS ORIGINAL SIN CAMBIOS  */
-document.head.insertAdjacentHTML('beforeend', `<style>
-/* ... ESTILOS EXACTAMENTE IGUALES A LOS ORIGINALES ... */
-</style>`);
+  // ─────────────────────────────
+  // FAB Group
+  // ─────────────────────────────
+  const fabGroup = document.createElement('div');
+  fabGroup.id = 'fab-group';
+  document.body.appendChild(fabGroup);
 
-// ─────────────────────────────────────────────────────────────
-// TOAST (SIN CAMBIOS)
-// ─────────────────────────────────────────────────────────────
-export function showToast(msg, duration = 3000) {
-  const t = document.createElement('div');
-  t.className  = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), duration);
-}
+  // ─────────────────────────────
+  // Botón Lock Cámara
+  // ─────────────────────────────
+  const fabLock = document.createElement('button');
+  fabLock.className = 'fab-child';
+  fabLock.innerText = '🔒';
+  fabLock.title = 'Bloquear cámara';
+  fabGroup.appendChild(fabLock);
 
-/*  TODO EL BLOQUE DE HELPERS Y MODALES SIN CAMBIOS  */
+  let locked = false;
+  fabLock.addEventListener('click', () => {
+    locked = onCameraLockChange();
+    fabLock.innerText = locked ? '🔓' : '🔒';
+  });
 
-// ─────────────────────────────────────────────────────────────
-// closeAll — SIN CAMBIOS
-// ─────────────────────────────────────────────────────────────
-export function closeAll() {
-  document.getElementById('side-menu')?.classList.remove('open');
-  document.getElementById('brush-panel')?.classList.remove('visible');
-  document.getElementById('palette-popup')?.classList.remove('visible');
-  document.getElementById('palette-div')?.classList.remove('visible');
-  document.getElementById('fab-main')?.classList.remove('open');
-  document.getElementById('fab-children')?.classList.remove('open');
-}
-
-// ─────────────────────────────────────────────────────────────
-// buildUI
-// ─────────────────────────────────────────────────────────────
-export function buildUI({ cameraLockedRef, onCameraLockChange }) {
-
-  /*  TODO: TODO EL BLOQUE DRAWER + FAB LOCK SIN CAMBIOS  */
-
+  // ─────────────────────────────
+  // Contenedor hijos
+  // ─────────────────────────────
   const fabChildren = document.createElement('div');
   fabChildren.id = 'fab-children';
   fabGroup.appendChild(fabChildren);
 
-  const makeFabChild = (icon, tip) => {
-    const btn = document.createElement('div');
-    btn.className = 'fab';
-    btn.setAttribute('data-tip', tip);
-    btn.textContent = icon;
-    fabChildren.appendChild(btn);
-    return btn;
-  };
+  // ─────────────────────────────
+  // Botón Color (AHORA ES EL PRINCIPAL)
+  // ─────────────────────────────
+  const fabColor = document.createElement('button');
+  fabColor.className = 'fab-child';
+  fabColor.title = 'Seleccionar color';
 
-  const fabMenu    = makeFabChild('☰',  'Menú');
-  const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
-
-  // ─────────────────────────────────────────
-  // CAMBIO AQUÍ ↓↓↓
-  // ─────────────────────────────────────────
-
-  const fabPalette = document.createElement('div');
-  fabPalette.className = 'fab';
-  fabPalette.setAttribute('data-tip', 'Paleta de colores');
-  fabPalette.style.background = '#ff0000'; // color inicial
-  fabChildren.appendChild(fabPalette);
-
-  // ─────────────────────────────────────────
-  // FIN CAMBIO
-  // ─────────────────────────────────────────
-
-  const fabMain = document.createElement('div');
-  fabMain.id = 'fab-main';
-  fabMain.className = 'fab';
-  fabMain.textContent = '+';
-  fabGroup.appendChild(fabMain);
-
-  let fabOpen = false;
-  const toggleFab = () => {
-    fabOpen = !fabOpen;
-    fabMain.classList.toggle('open', fabOpen);
-    fabChildren.classList.toggle('open', fabOpen);
-  };
-  fabMain.addEventListener('click', e => { e.stopPropagation(); toggleFab(); });
-
-  /*  TODO BLOQUE PINCEL SIN CAMBIOS  */
-
-  // ─────────────────────────────────────────
-  // PALETA
-  // ─────────────────────────────────────────
-
-  const palettePopup = document.createElement('div');
-  palettePopup.id = 'palette-popup';
-  document.body.appendChild(palettePopup);
-
-  const paletteDiv = document.createElement('div');
-  paletteDiv.id = 'palette-div';
-  palettePopup.appendChild(paletteDiv);
-
-  const eyedropperBtn = document.createElement('button');
-  eyedropperBtn.id = 'eyedropper-btn';
-  eyedropperBtn.innerHTML = '💉 Gotero';
-  paletteDiv.appendChild(eyedropperBtn);
-
-  eyedropperBtn.addEventListener('click', () => {
-    const next = !eyedropperActive;
-    setEyedropperActive(next);
-    eyedropperBtn.classList.toggle('active', next);
-    document.body.classList.toggle('eyedropper-cursor', next);
-    if (next) paletteDiv.classList.remove('visible');
+  const colorPreview = document.createElement('div');
+  Object.assign(colorPreview.style, {
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    background: '#ff0000',
+    border: '2px solid white'
   });
 
-  const hslToHex = (h, s, l) => {
-    s /= 100; l /= 100;
-    const k = n => (n + h / 30) % 12;
-    const a = s * Math.min(l, 1 - l);
-    const f = n => Math.round(255 * (l - a * Math.max(Math.min(k(n)-3, 9-k(n), 1), -1))).toString(16).padStart(2, '0');
-    return `#${f(0)}${f(8)}${f(4)}`;
-  };
+  fabColor.appendChild(colorPreview);
+  fabChildren.appendChild(fabColor);
 
-  ['#000000', '#888888', '#ffffff',
-    ...Array.from({ length: 97 }, (_, i) => hslToHex((i / 97) * 360, 80, 50))
-  ].forEach(color => {
+  // ─────────────────────────────
+  // Paleta
+  // ─────────────────────────────
+  const palette = document.createElement('div');
+  palette.id = 'color-palette';
+  palette.style.display = 'none';
+  document.body.appendChild(palette);
 
-    const sw = document.createElement('div');
-    sw.className = 'color-swatch';
-    sw.style.background = color;
-    sw.title = color;
+  const colors = [
+    '#ff0000','#00ff00','#0000ff','#ffff00',
+    '#ff00ff','#00ffff','#ffffff','#000000'
+  ];
 
-    sw.addEventListener('click', () => {
-      setCurrentColor(color);
+  colors.forEach(c => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.style.background = c;
+    palette.appendChild(swatch);
 
-      // actualizar botón FAB
-      fabPalette.style.background = color;
-
-      paletteDiv.classList.remove('visible');
+    swatch.addEventListener('click', () => {
+      colorPreview.style.background = c;
+      brushCircle.style.borderColor = c;
+      palette.style.display = 'none';
     });
-
-    paletteDiv.appendChild(sw);
   });
 
-  // ─────────────────────────────────────────
-  // FAB PALETA — ABRE DIRECTAMENTE
-  // ─────────────────────────────────────────
-
-  fabPalette.addEventListener('click', e => {
-    e.stopPropagation();
-    const isOpen = palettePopup.classList.contains('visible');
-    closeAll();
-    if (!isOpen) {
-      palettePopup.classList.add('visible');
-      paletteDiv.classList.add('visible'); // abre directamente
-      fabOpen = true;
-      fabMain.classList.add('open');
-      fabChildren.classList.add('open');
-    }
+  // Abrir/cerrar paleta directamente
+  fabColor.addEventListener('click', () => {
+    palette.style.display =
+      palette.style.display === 'none' ? 'flex' : 'none';
   });
 
-  /*  TODO BLOQUE RESTANTE SIN CAMBIOS  */
+  // ─────────────────────────────
+  // Callback gotero
+  // ─────────────────────────────
+  function onColorPicked(hex) {
+    colorPreview.style.background = hex;
+    brushCircle.style.borderColor = hex;
+  }
 
-  return {
-    brushCircle,
-    currentColorBtn: fabPalette,
-    onColorPicked: (color) => {
-      setCurrentColor(color);
-      setEyedropperActive(false);
-      eyedropperBtn.classList.remove('active');
-      document.body.classList.remove('eyedropper-cursor');
-      fabPalette.style.background = color;
-    }
-  };
+  return { brushCircle, onColorPicked };
 }
