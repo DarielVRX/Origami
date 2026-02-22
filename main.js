@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module'; 
+importimport * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module'; 
 import { GLTFLoader } from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module'; 
 import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module'; 
 
@@ -41,7 +41,7 @@ let lastClickedObject = null;
 let selectedObjects = []; 
 let isDrawing = false; 
 let currentColor = '#ff0000'; 
-let brushSize = 2; 
+let brushSize = 1; // ahora coincide con slider default
 
 // ===================== CARGAR GLB AUTOMÁTICAMENTE ===================== 
 loader.load('ModeloGLB.glb', (gltf) => { 
@@ -95,7 +95,6 @@ paletteWrapper.style.flexDirection='column';
 paletteWrapper.style.alignItems='center'; 
 document.body.appendChild(paletteWrapper); 
 
-// Botón color actual
 const currentColorBtn = document.createElement('div'); 
 currentColorBtn.style.width='40px'; 
 currentColorBtn.style.height='40px'; 
@@ -110,26 +109,23 @@ currentColorBtn.style.justifyContent='center';
 currentColorBtn.style.boxShadow='0 0 5px rgba(0,0,0,0.5)'; 
 paletteWrapper.appendChild(currentColorBtn); 
 
-// Contenedor de paleta (oculto inicialmente)
 const paletteDiv = document.createElement('div'); 
 paletteDiv.style.display='none'; 
 paletteDiv.style.marginTop='5px'; 
 paletteDiv.style.padding='5px'; 
 paletteDiv.style.background='rgba(255,255,255,0.95)'; 
-paletteDiv.style.display='grid'; 
 paletteDiv.style.gridTemplateColumns='repeat(6,1fr)'; 
 paletteDiv.style.gridAutoRows='1fr'; 
 paletteDiv.style.gap='6px'; 
 paletteDiv.style.maxHeight='60vh'; 
 paletteDiv.style.overflowY='auto'; 
+paletteDiv.style.display='grid'; 
 paletteWrapper.appendChild(paletteDiv); 
 
-// Mostrar/ocultar paleta al hacer click
 currentColorBtn.addEventListener('click',()=>{
   paletteDiv.style.display = paletteDiv.style.display==='none' ? 'grid':'none';
 });
 
-// Crear colores
 colors.forEach(color=>{
   const btn = document.createElement('div'); 
   btn.style.width='25px'; 
@@ -143,10 +139,10 @@ colors.forEach(color=>{
   btn.addEventListener('mouseenter',()=>btn.style.outline='2px solid yellow'); 
   btn.addEventListener('mouseleave',()=>btn.style.outline='none'); 
 
-  // Click: usar color
   btn.addEventListener('click',()=>{
     currentColor=color;
     currentColorBtn.style.background=color;
+    paletteDiv.style.display='none'; // se oculta automáticamente al usar el color
   });
 
   paletteDiv.appendChild(btn); 
@@ -157,7 +153,7 @@ const brushSlider = document.createElement('input');
 brushSlider.type='range'; 
 brushSlider.min='1'; 
 brushSlider.max='10'; 
-brushSlider.value=1; 
+brushSlider.value=brushSize; 
 brushSlider.style.position='fixed'; 
 brushSlider.style.top='20px'; 
 brushSlider.style.left='50%';
@@ -469,4 +465,5 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
