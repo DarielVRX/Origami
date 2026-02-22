@@ -39,7 +39,6 @@ let glbModel = null;
 // ===================== RAYCASTER =====================
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-const maxDistance = 80;
 
 // ===================== CARGAR GLB AUTOMÁTICAMENTE =====================
 loader.load('ModeloGLB.glb', (gltf)=>{
@@ -154,7 +153,7 @@ sliderBtn.style.border='1px solid #888';
 sliderBtn.style.borderRadius='4px';
 sliderBtn.style.cursor='pointer';
 sliderBtn.title='Brush size';
-paletteWrapper.appendChild(sliderBtn);
+document.body.appendChild(sliderBtn);
 
 const brushSlider = document.createElement('input');
 brushSlider.type='range';
@@ -200,7 +199,7 @@ fileText.style.left='50%';
 fileText.style.transform='translateX(-50%)';
 fileText.style.zIndex=1000;
 fileText.style.padding='5px 10px';
-fileText.style.background='rgba(0,0,0,0.2)';
+fileText.style.background='rgba(0,0,0,0.1)';
 fileText.style.borderRadius='6px';
 fileText.style.color='#000';
 fileText.style.fontSize='0.9em';
@@ -217,11 +216,15 @@ hamburgerBtn.style.border='1px solid #888';
 hamburgerBtn.style.borderRadius='4px';
 hamburgerBtn.style.cursor='pointer';
 hamburgerBtn.title='Menu';
-paletteWrapper.appendChild(hamburgerBtn);
+hamburgerBtn.style.position='fixed';
+hamburgerBtn.style.left='10px';
+hamburgerBtn.style.bottom='10px';
+hamburgerBtn.style.zIndex=1000;
+document.body.appendChild(hamburgerBtn);
 
 const hamburgerMenu = document.createElement('div');
 hamburgerMenu.style.position='fixed';
-hamburgerMenu.style.bottom='150px';
+hamburgerMenu.style.bottom='50px';
 hamburgerMenu.style.left='10px';
 hamburgerMenu.style.display='none';
 hamburgerMenu.style.flexDirection='column';
@@ -260,12 +263,6 @@ loadFileBtn.style.padding='5px';
 loadFileBtn.style.cursor='pointer';
 hamburgerMenu.appendChild(loadFileBtn);
 
-// ===================== INTERACCIONES =====================
-renderer.domElement.addEventListener('mousemove',onMouseMove);
-renderer.domElement.addEventListener('mousedown',onMouseDown);
-renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
-renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
-
 // ===================== GOTERO =====================
 const eyedropperBtn = document.createElement('div');
 eyedropperBtn.style.width='30px';
@@ -298,13 +295,10 @@ function handleHoverAndPaint(intersects){
   glbModel.traverse(child=>{
     if(child.isMesh){
       let shouldHighlight=false;
-      if(brushSize<=parseFloat(brushSlider.min)) shouldHighlight=(child===hoveredObject);
-      else{
-        const pos=child.geometry.attributes.position;
-        for(let i=0;i<pos.count;i++){
-          const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){ shouldHighlight=true; break; }
-        }
+      const pos=child.geometry.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+        if(vertex.distanceTo(hitPoint)<=brushSize){ shouldHighlight=true; break; }
       }
       if(child!==lastClickedObject){
         child.material.emissive.setHex(0xffffff);
@@ -353,7 +347,6 @@ function onMouseDown(event){
   const intersects=raycaster.intersectObjects(glbModel.children,true);
   if(intersects.length>0){
     const clickedObj=intersects[0].object;
-    // Gotero solo al hacer clic
     if(eyedropperActive){
       currentColor='#'+clickedObj.material.color.getHexString();
       currentColorBtn.style.background=currentColor;
@@ -371,6 +364,11 @@ function onMouseDown(event){
   }
   handleHoverAndPaint(intersects);
 }
+
+renderer.domElement.addEventListener('mousemove',onMouseMove);
+renderer.domElement.addEventListener('mousedown',onMouseDown);
+renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 
 // ===================== CARGAR ARCHIVO =====================
 loadFileBtn.addEventListener('change',(event)=>{
@@ -436,6 +434,11 @@ exportImgBtn.addEventListener('click',()=>{
 // ===================== EXPORTAR GLB CON COLORES =====================
 exportGLBBtn.addEventListener('click', ()=>{
   if(!glbModel) return alert("No hay modelo cargado");
+  glbModel.traverse(child=>{
+    if(child.isMesh && child.userData.currentColor){
+      child.material.color.copy(child.userData.currentColor);
+    }
+  });
   const exporter = new GLTFExporter();
   exporter.parse(glbModel, function(result){
     let output;
