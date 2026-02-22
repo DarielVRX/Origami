@@ -1,13 +1,13 @@
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { GLTFLoader } from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { OrbitControls } from 'https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module';
+import { GLTFExporter } from 'https://unpkg.com/three@0.163.0/examples/jsm/exporters/GLTFExporter.js?module';
 
 // ===================== ESCENA Y CÁMARA =====================
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xeeeeee);
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-camera.position.set(0, 22, 80);
-
+camera.position.set(0,22,80);
 const renderer = new THREE.WebGLRenderer({antialias:true});
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -24,8 +24,13 @@ scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1.2));
 scene.add(new THREE.AxesHelper(5));
 
 // ===================== MATERIALES =====================
-const baseMaterial = new THREE.MeshStandardMaterial({color:0xaaaaaa});
+const baseMaterial = new THREE.MeshStandardMaterial({color:0xaaaaaa, emissive:0xffffaa, emissiveIntensity:0.05});
 let lastClickedObject = null;
+let hoveredObject = null;
+let selectedObjects = [];
+let isDrawing = false;
+let currentColor = '#ff0000';
+let brushSize = 1;
 
 // ===================== GLB =====================
 const loader = new GLTFLoader();
@@ -34,20 +39,15 @@ let glbModel = null;
 // ===================== RAYCASTER =====================
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
-let hoveredObject = null;
-let selectedObjects = [];
-let isDrawing = false;
-let currentColor = '#ff0000';
-let brushSize = 1;
-let eyedropperActive = false;
+const maxDistance = 80;
 
 // ===================== CARGAR GLB AUTOMÁTICAMENTE =====================
-loader.load('ModeloGLB.glb', (gltf) => {
+loader.load('ModeloGLB.glb', (gltf)=>{
   if(glbModel) scene.remove(glbModel);
   glbModel = gltf.scene;
-  glbModel.scale.set(0.5, 0.5, 0.5);
-  glbModel.position.set(0, 0, 0);
-  glbModel.traverse(child => {
+  glbModel.scale.set(0.5,0.5,0.5);
+  glbModel.position.set(0,0,0);
+  glbModel.traverse(child=>{
     if(child.isMesh){
       child.material = baseMaterial.clone();
       child.userData.originalMaterial = child.material.clone();
@@ -62,23 +62,21 @@ loader.load('ModeloGLB.glb', (gltf) => {
   console.log("¡GLB cargado automáticamente!");
 }, undefined, console.error);
 
-// ===================== PALETA DE 100 COLORES GRADUAL =====================
+// ===================== PALETA DE COLORES =====================
+let eyedropperActive = false;
 const colors = ['#000000','#888888','#ffffff'];
 const totalColors = 97;
 for(let i=0;i<totalColors;i++){
   const hue = (i/totalColors)*360;
-  const saturation = 80;
-  const lightness = 50;
+  const saturation=80;
+  const lightness=50;
   colors.push(hslToHex(hue,saturation,lightness));
 }
 function hslToHex(h,s,l){
   s/=100;l/=100;
   const k=n=>(n+h/30)%12;
   const a=s*Math.min(l,1-l);
-  const f=n=>{
-    const val=l - a * Math.max(Math.min(k(n)-3,9-k(n),1),-1);
-    return Math.round(255*val).toString(16).padStart(2,'0');
-  };
+  const f=n=>{ const val=l - a * Math.max(Math.min(k(n)-3,9-k(n),1),-1); return Math.round(255*val).toString(16).padStart(2,'0'); };
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
@@ -101,14 +99,14 @@ currentColorBtn.style.borderRadius='6px';
 currentColorBtn.style.border='2px solid #000';
 currentColorBtn.style.background=currentColor;
 currentColorBtn.style.cursor='pointer';
-currentColorBtn.title = 'Click para abrir la paleta';
+currentColorBtn.title='Click para abrir la paleta';
 currentColorBtn.style.display='flex';
 currentColorBtn.style.alignItems='center';
 currentColorBtn.style.justifyContent='center';
 currentColorBtn.style.boxShadow='0 0 5px rgba(0,0,0,0.5)';
 paletteWrapper.appendChild(currentColorBtn);
 
-// Contenedor de paleta (oculto inicialmente)
+// Contenedor de paleta
 const paletteDiv = document.createElement('div');
 paletteDiv.style.display='none';
 paletteDiv.style.marginTop='5px';
@@ -122,9 +120,9 @@ paletteDiv.style.maxHeight='60vh';
 paletteDiv.style.overflowY='auto';
 paletteWrapper.appendChild(paletteDiv);
 
-// Mostrar/ocultar paleta al hacer click
+// Mostrar/ocultar paleta
 currentColorBtn.addEventListener('click',()=>{
-  paletteDiv.style.display = paletteDiv.style.display==='none' ? 'grid':'none';
+  paletteDiv.style.display = paletteDiv.style.display==='none'?'grid':'none';
 });
 
 // Crear colores
@@ -136,33 +134,10 @@ colors.forEach(color=>{
   btn.style.background=color;
   btn.style.cursor='pointer';
   btn.title=color;
-
   btn.addEventListener('mouseenter',()=>btn.style.outline='2px solid yellow');
   btn.addEventListener('mouseleave',()=>btn.style.outline='none');
-
-  btn.addEventListener('click',()=>{
-    currentColor=color;
-    currentColorBtn.style.background=color;
-  });
-
+  btn.addEventListener('click',()=>{ currentColor=color; currentColorBtn.style.background=color; paletteDiv.style.display='none'; });
   paletteDiv.appendChild(btn);
-});
-
-// Gotero
-const eyedropperBtn = document.createElement('div');
-eyedropperBtn.style.width = '30px';
-eyedropperBtn.style.height = '30px';
-eyedropperBtn.style.marginTop = '5px';
-eyedropperBtn.style.borderRadius = '4px';
-eyedropperBtn.style.border = '2px solid #000';
-eyedropperBtn.style.background = 'url(data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDAwMDAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHBhdGggZD0iTTguNSAxOC41TDEwIDIwTDE2IDE0bC0xLjUtMS41TDguNSAxOC41eiIvPjwvc3ZnPg==) center/contain no-repeat';
-eyedropperBtn.style.cursor = 'pointer';
-eyedropperBtn.title = 'Activar gotero';
-paletteWrapper.appendChild(eyedropperBtn);
-
-eyedropperBtn.addEventListener('click', () => {
-  eyedropperActive = !eyedropperActive;
-  eyedropperBtn.style.boxShadow = eyedropperActive ? '0 0 8px 2px yellow' : 'none';
 });
 
 // ===================== SLIDER PUNTERO =====================
@@ -170,11 +145,11 @@ const brushSlider = document.createElement('input');
 brushSlider.type='range';
 brushSlider.min='1';
 brushSlider.max='10';
-brushSlider.value=1;
+brushSlider.value='1';
 brushSlider.style.position='fixed';
 brushSlider.style.top='20px';
 brushSlider.style.left='50%';
-brushSlider.style.transform = 'translateX(-50%)';
+brushSlider.style.transform='translateX(-50%)';
 brushSlider.style.zIndex=1000;
 brushSlider.style.width='1000px';
 document.body.appendChild(brushSlider);
@@ -190,7 +165,7 @@ brushCircle.style.transition='opacity 0.3s';
 document.body.appendChild(brushCircle);
 
 brushSlider.addEventListener('input',()=>{
-  brushSize = parseFloat(brushSlider.value);
+  brushSize=parseFloat(brushSlider.value);
   brushCircle.style.width=brushSize*10+'px';
   brushCircle.style.height=brushSize*10+'px';
   brushCircle.style.opacity=1;
@@ -199,7 +174,7 @@ brushSlider.addEventListener('input',()=>{
 
 // ===================== EXPORTAR IMAGEN 2x2 =====================
 const exportImgBtn = document.createElement('button');
-exportImgBtn.textContent = "Exportar Imagen 2x2";
+exportImgBtn.textContent="Exportar Imagen 2x2";
 exportImgBtn.style.position='fixed';
 exportImgBtn.style.bottom='10px';
 exportImgBtn.style.left='10px';
@@ -211,37 +186,32 @@ document.body.appendChild(exportImgBtn);
 
 exportImgBtn.addEventListener('click',()=>{
   if(!glbModel) return alert("No hay modelo cargado");
-  const positions = [
-    new THREE.Vector3(0,22,70),
-    new THREE.Vector3(0,22,-70),
-    new THREE.Vector3(70,22,0),
-    new THREE.Vector3(-70,22,0)
-  ];
-  const size = 4096;
-  const gap = 10;
-  const totalSize = size*2 + gap;
-  const canvas = document.createElement('canvas');
+  const positions=[ new THREE.Vector3(0,22,70), new THREE.Vector3(0,22,-70), new THREE.Vector3(70,22,0), new THREE.Vector3(-70,22,0) ];
+  const size=4096;
+  const gap=10;
+  const totalSize=size*2+gap;
+  const canvas=document.createElement('canvas');
   canvas.width=totalSize;
   canvas.height=totalSize;
-  const ctx = canvas.getContext('2d');
-  const originalPos = camera.position.clone();
-  const originalTarget = controls.target.clone();
+  const ctx=canvas.getContext('2d');
+  const originalPos=camera.position.clone();
+  const originalTarget=controls.target.clone();
   positions.forEach((pos,i)=>{
     camera.position.copy(pos);
     controls.target.set(0,22,0);
     controls.update();
     renderer.render(scene,camera);
-    const imgData = renderer.domElement.toDataURL();
-    const img = new Image();
-    img.src = imgData;
-    const x = (i%2)*(size+gap);
-    const y = Math.floor(i/2)*(size+gap);
-    img.onload = ()=>ctx.drawImage(img,x,y,size,size);
+    const imgData=renderer.domElement.toDataURL();
+    const img=new Image();
+    img.src=imgData;
+    const x=(i%2)*(size+gap);
+    const y=Math.floor(i/2)*(size+gap);
+    img.onload=()=>ctx.drawImage(img,x,y,size,size);
   });
   setTimeout(()=>{
-    const link = document.createElement('a');
-    link.href = canvas.toDataURL('image/png');
-    link.download = 'collage_2x2.png';
+    const link=document.createElement('a');
+    link.href=canvas.toDataURL('image/png');
+    link.download='collage_2x2.png';
     link.click();
     camera.position.copy(originalPos);
     controls.target.copy(originalTarget);
@@ -249,10 +219,35 @@ exportImgBtn.addEventListener('click',()=>{
   },500);
 });
 
+// ===================== EXPORTAR GLB =====================
+const exportGLBBtn = document.createElement('button');
+exportGLBBtn.textContent="Exportar GLB";
+exportGLBBtn.style.position='fixed';
+exportGLBBtn.style.bottom='60px';
+exportGLBBtn.style.left='10px';
+exportGLBBtn.style.padding='10px';
+exportGLBBtn.style.fontSize='1em';
+exportGLBBtn.style.cursor='pointer';
+exportGLBBtn.style.zIndex=1000;
+document.body.appendChild(exportGLBBtn);
+
+exportGLBBtn.addEventListener('click', ()=>{
+  if(!glbModel) return alert("No hay modelo cargado");
+  const exporter = new GLTFExporter();
+  exporter.parse(glbModel, (result)=>{
+    const output = JSON.stringify(result, null, 2);
+    const blob = new Blob([output], {type:'application/json'});
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download='modelo.glb';
+    link.click();
+  }, {binary:true});
+});
+
 // ===================== BLOQUEO DE CAMARA =====================
-let cameraLocked = false;
-const cameraLockBtn = document.createElement('button');
-cameraLockBtn.textContent = "Bloquear Cámara";
+let cameraLocked=false;
+const cameraLockBtn=document.createElement('button');
+cameraLockBtn.textContent="Bloquear Cámara";
 cameraLockBtn.style.position='fixed';
 cameraLockBtn.style.bottom='100px';
 cameraLockBtn.style.left='10px';
@@ -262,166 +257,127 @@ cameraLockBtn.style.cursor='pointer';
 cameraLockBtn.style.zIndex=1000;
 document.body.appendChild(cameraLockBtn);
 
-cameraLockBtn.addEventListener('click', () => {
-  cameraLocked = !cameraLocked;
-  controls.enableRotate = !cameraLocked;
-  cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara";
+cameraLockBtn.addEventListener('click',()=>{
+  cameraLocked=!cameraLocked;
+  controls.enableRotate=!cameraLocked;
+  cameraLockBtn.textContent=cameraLocked?"Desbloquear Cámara":"Bloquear Cámara";
 });
 
 // ===================== INTERACCIONES =====================
-const maxDistance = 80;
 renderer.domElement.addEventListener('mousemove',onMouseMove);
 renderer.domElement.addEventListener('mousedown',onMouseDown);
 renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
-renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 
-function handleHoverHighlight(obj,hitPoint){
+// ===================== GOTERO =====================
+const eyedropperBtn = document.createElement('div');
+eyedropperBtn.style.width='30px';
+eyedropperBtn.style.height='30px';
+eyedropperBtn.style.marginTop='5px';
+eyedropperBtn.style.borderRadius='4px';
+eyedropperBtn.style.border='2px solid #000';
+eyedropperBtn.style.background='url(data:image/svg+xml;base64,PHN2ZyBmaWxsPSIjMDAwMDAwIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCI+PHBhdGggZD0iTTguNSAxOC41TDEwIDIwTDE2IDE0bC0xLjUtMS41TDguNSAxOC41eiIvPjwvc3ZnPg==) center/contain no-repeat';
+eyedropperBtn.style.cursor='pointer';
+eyedropperBtn.title='Activar gotero';
+paletteWrapper.appendChild(eyedropperBtn);
+
+eyedropperBtn.addEventListener('click',()=>{
+  eyedropperActive=!eyedropperActive;
+  eyedropperBtn.style.boxShadow = eyedropperActive?'0 0 8px 2px yellow':'none';
+});
+
+// ===================== FUNCIONES DE INTERACCIÓN =====================
+function handleHoverAndPaint(intersects){
+  if(intersects.length===0){
+    glbModel.traverse(child=>{
+      if(child.isMesh && child!==lastClickedObject) child.material.emissiveIntensity=0;
+    });
+    return;
+  }
+
+  const hitPoint=intersects[0].point;
+  hoveredObject=intersects[0].object;
+
   glbModel.traverse(child=>{
     if(child.isMesh){
-      let shouldHighlight = false;
-      if(brushSize <= parseFloat(brushSlider.min)){
-        shouldHighlight = (child === obj);
-      } else {
-        const pos = child.geometry.attributes.position;
+      let shouldHighlight=false;
+      if(brushSize<=parseFloat(brushSlider.min)) shouldHighlight=(child===hoveredObject);
+      else{
+        const pos=child.geometry.attributes.position;
         for(let i=0;i<pos.count;i++){
-          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+          const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
           if(vertex.distanceTo(hitPoint)<=brushSize){ shouldHighlight=true; break; }
         }
       }
       if(child!==lastClickedObject){
-        child.material.emissive.setHex(shouldHighlight?0xffffaa:0x000000);
+        child.material.emissive.setHex(0xffffaa);
+        child.material.emissiveIntensity=shouldHighlight?0.05:0;
       }
     }
   });
-}
 
-function handlePaint(obj,hitPoint){
-  if(brushSize <= parseFloat(brushSlider.min)){
-    obj.material.color.set(currentColor);
-    obj.userData.currentColor = obj.material.color.clone();
-    if(!selectedObjects.includes(obj)) selectedObjects.push(obj);
-  } else {
-    glbModel.traverse(child=>{
-      if(child.isMesh){
-        const pos = child.geometry.attributes.position;
-        for(let i=0;i<pos.count;i++){
-          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){
-            if(!child.userData.currentColor) child.material = child.userData.originalMaterial.clone();
-            child.material.color.set(currentColor);
-            child.userData.currentColor = child.material.color.clone();
-            if(!selectedObjects.includes(child)) selectedObjects.push(child);
-            break;
+  if(isDrawing && hoveredObject){
+    if(brushSize<=parseFloat(brushSlider.min)){
+      hoveredObject.material.color.set(currentColor);
+      hoveredObject.userData.currentColor=hoveredObject.material.color.clone();
+      if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
+    } else{
+      glbModel.traverse(child=>{
+        if(child.isMesh){
+          const pos=child.geometry.attributes.position;
+          for(let i=0;i<pos.count;i++){
+            const vertex=new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+            if(vertex.distanceTo(hitPoint)<=brushSize){
+              if(!child.userData.currentColor) child.material=child.userData.originalMaterial.clone();
+              child.material.color.set(currentColor);
+              child.userData.currentColor=child.material.color.clone();
+              if(!selectedObjects.includes(child)) selectedObjects.push(child);
+              break;
+            }
           }
         }
-      }
-    });
+      });
+    }
   }
 }
 
 function onMouseMove(event){
   if(!glbModel) return;
-  mouse.x = (event.clientX / window.innerWidth)*2-1;
-  mouse.y = -(event.clientY / window.innerHeight)*2+1;
-
-  brushCircle.style.left = event.clientX - brushCircle.offsetWidth/2 + 'px';
-  brushCircle.style.top = event.clientY - brushCircle.offsetHeight/2 + 'px';
-
+  mouse.x=(event.clientX/window.innerWidth)*2-1;
+  mouse.y=-(event.clientY/window.innerHeight)*2+1;
+  brushCircle.style.left=event.clientX-brushCircle.offsetWidth/2+'px';
+  brushCircle.style.top=event.clientY-brushCircle.offsetHeight/2+'px';
   raycaster.setFromCamera(mouse,camera);
-  const intersects = raycaster.intersectObjects(glbModel.children,true);
-  hoveredObject = intersects.length>0 ? intersects[0].object : null;
-
-  if(intersects.length>0 && intersects[0].distance<=maxDistance){
-    const hitPoint = intersects[0].point;
-
-    handleHoverHighlight(hoveredObject,hitPoint);
-
-    if(isDrawing && hoveredObject) handlePaint(hoveredObject,hitPoint);
-
-  } else {
-    glbModel.traverse(child=>{
-      if(child.isMesh && child!==lastClickedObject){
-        child.material.emissive.setHex(0x000000);
-      }
-    });
-  }
+  const intersects=raycaster.intersectObjects(glbModel.children,true);
+  handleHoverAndPaint(intersects);
 }
 
 function onMouseDown(event){
-  if(event.button===0){
-    isDrawing = true;
-    mouse.x = (event.clientX / window.innerWidth)*2-1;
-    mouse.y = -(event.clientY / window.innerHeight)*2+1;
-
-    raycaster.setFromCamera(mouse,camera);
-    const intersects = raycaster.intersectObjects(glbModel.children,true);
-    if(intersects.length>0){
-      const clickedObj = intersects[0].object;
-
-      // Gotero solo si activo
-      if(eyedropperActive){
-        currentColor = '#' + clickedObj.material.color.getHexString();
-        currentColorBtn.style.background = currentColor;
-        eyedropperActive = false;
-        eyedropperBtn.style.boxShadow='none';
-        return; // no iniciar pintado
-      }
-
-      if(lastClickedObject && lastClickedObject!==clickedObj){
-        lastClickedObject.material.emissive.setHex(0x000000);
-      }
-      lastClickedObject = clickedObj;
-      lastClickedObject.material.emissive.setHex(0xffffaa);
+  if(event.button!==0) return;
+  isDrawing=true;
+  mouse.x=(event.clientX/window.innerWidth)*2-1;
+  mouse.y=-(event.clientY/window.innerHeight)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const intersects=raycaster.intersectObjects(glbModel.children,true);
+  if(intersects.length>0){
+    const clickedObj=intersects[0].object;
+    // Gotero solo al hacer clic
+    if(eyedropperActive){
+      currentColor='#'+clickedObj.material.color.getHexString();
+      currentColorBtn.style.background=currentColor;
+      eyedropperActive=false;
+      eyedropperBtn.style.boxShadow='none';
+      return;
     }
 
-    onMouseMove(event);
+    if(lastClickedObject && lastClickedObject!==clickedObj){
+      lastClickedObject.material.emissiveIntensity=0;
+    }
+    lastClickedObject=clickedObj;
+    lastClickedObject.material.emissive.setHex(0xffffaa);
+    lastClickedObject.material.emissiveIntensity=0.05;
   }
-}
-
-// ===================== INTERACCIONES TÁCTILES =====================
-renderer.domElement.addEventListener('touchstart', (event) => {
-  if(!glbModel) return;
-  if(event.touches.length===1){
-    isDrawing=true;
-    const touch=event.touches[0];
-    mouse.x = (touch.clientX / window.innerWidth)*2-1;
-    mouse.y = -(touch.clientY / window.innerHeight)*2+1;
-    onTouchHover(mouse);
-  }
-  if(event.touches.length===2){
-    controls.enableRotate = !cameraLocked;
-    controls.enableZoom = true;
-  }
-},{passive:false});
-
-renderer.domElement.addEventListener('touchmove', (event) => {
-  if(!glbModel) return;
-  if(event.touches.length===1 && isDrawing){
-    const touch=event.touches[0];
-    mouse.x = (touch.clientX / window.innerWidth)*2-1;
-    mouse.y = -(touch.clientY / window.innerHeight)*2+1;
-    onTouchHover(mouse);
-    brushCircle.style.left = touch.clientX - brushCircle.offsetWidth/2 + 'px';
-    brushCircle.style.top = touch.clientY - brushCircle.offsetHeight/2 + 'px';
-  }
-},{passive:false});
-
-renderer.domElement.addEventListener('touchend',()=>isDrawing=false);
-
-function onTouchHover(touchVec2){
-  raycaster.setFromCamera(touchVec2,camera);
-  const intersects = raycaster.intersectObjects(glbModel.children,true);
-  hoveredObject = intersects.length>0 ? intersects[0].object : null;
-
-  if(intersects.length>0 && intersects[0].distance<=maxDistance){
-    const hitPoint = intersects[0].point;
-    handleHoverHighlight(hoveredObject,hitPoint);
-    if(isDrawing && hoveredObject) handlePaint(hoveredObject,hitPoint);
-  } else {
-    glbModel.traverse(child=>{
-      if(child.isMesh && child!==lastClickedObject) child.material.emissive.setHex(0x000000);
-    });
-  }
+  handleHoverAndPaint(intersects);
 }
 
 // ===================== ANIMACIÓN =====================
@@ -434,7 +390,7 @@ animate();
 
 // ===================== AJUSTE VENTANA =====================
 window.addEventListener('resize',()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.aspect=window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
