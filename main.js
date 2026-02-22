@@ -318,6 +318,8 @@ function onMouseMove(event){
   }
 }
 
+//---------------ON MOUSE DOWN ----------------------------
+
 function onMouseDown(event){
   if(!glbModel) return;
 
@@ -326,47 +328,109 @@ function onMouseDown(event){
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(glbModel.children, true);
 
+  if(intersects.length === 0) return;
+
+  const clickedObj = intersects[0].object;
+
   // GOTERO solo al hacer clic
-  if(eyedropperActive && intersects.length>0){
-    const obj = intersects[0].object;
-    if(obj.material && obj.material.color){
-      currentColor = '#' + obj.material.color.getHexString();
+  if(eyedropperActive){
+    if(clickedObj.material && clickedObj.material.color){
+      currentColor = '#' + clickedObj.material.color.getHexString();
       currentColorBtn.style.background = currentColor;
       eyedropperActive = false;
       eyedropperBtn.style.boxShadow = 'none';
-      return;
+      return; // salir sin dibujar ni resaltar
     }
   }
 
-  // DIBUJAR / RESALTE
-  if(event.button===0 && intersects.length>0){
+  if(event.button === 0){
     isDrawing = true;
+    lastClickedObject = clickedObj;
 
-    const clickedObj = intersects[0].object;
-
-    // Eliminar outline previo si existe
+    // ======= ELIMINAR OUTLINE ANTERIOR =======
     if(lastClickedOutline){
-      clickedObj.remove(lastClickedOutline); // ahora se parenta al objeto
+      scene.remove(lastClickedOutline);
       lastClickedOutline.geometry.dispose();
       lastClickedOutline.material.dispose();
       lastClickedOutline = null;
     }
 
-    lastClickedObject = clickedObj;
-
-    // Crear outline de bordes correctamente
+    // ======= CREAR OUTLINE NUEVO =======
     const edges = new THREE.EdgesGeometry(clickedObj.geometry);
     const line = new THREE.LineSegments(
       edges,
       new THREE.LineBasicMaterial({ color: 0xffffaa, linewidth: 2 })
     );
-    line.position.set(0,0,0);
-    line.rotation.set(0,0,0);
-    line.scale.set(1,1,1);
-    clickedObj.add(line); // se parenta al mesh
+    line.position.copy(clickedObj.position);
+    line.rotation.copy(clickedObj.rotation);
+    line.scale.copy(clickedObj.scale);
+    scene.add(line);
     lastClickedOutline = line;
 
-    onMouseMove(event);
+    onMouseMove(event); // actualizar hover/pintado inmediatamente
+  }
+}
+
+// ===== HOVER Y PINTADO =====
+function updateHoverAndPaint(intersects){
+  hoveredObject = intersects.length>0 ? intersects[0].object : null;
+  if(intersects.length>0 && intersects[0].distance <= maxDistance){
+    const hitPoint = intersects[0].point;
+
+    glbModel.traverse(child => {
+      if(child.isMesh){
+        let shouldHighlight = false;
+        if(brushSize <= parseFloat(brushSlider.min)){
+          shouldHighlight = (child === hoveredObject);
+        } else {
+          const pos = child.geometry.attributes.position;
+          for(let i=0;i<pos.count;i++){
+            const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+            if(vertex.distanceTo(hitPoint) <= brushSize){
+              shouldHighlight = true;
+              break;
+            }
+          }
+        }
+        if(child !== lastClickedObject){
+          child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
+        }
+      }
+    });
+
+    // Pintado
+    if(isDrawing && hoveredObject){
+      if(brushSize <= parseFloat(brushSlider.min)){
+        hoveredObject.material.color.set(currentColor);
+        hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
+        if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
+      } else {
+        glbModel.traverse(child => {
+          if(child.isMesh){
+            const pos = child.geometry.attributes.position;
+            for(let i=0;i<pos.count;i++){
+              const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+              if(vertex.distanceTo(hitPoint) <= brushSize){
+                if(!child.userData.currentColor){
+                  child.material = child.userData.originalMaterial.clone();
+                }
+                child.material.color.set(currentColor);
+                child.userData.currentColor = child.material.color.clone();
+                if(!selectedObjects.includes(child)) selectedObjects.push(child);
+                break;
+              }
+            }
+          }
+        });
+      }
+    }
+
+  } else {
+    glbModel.traverse(child => {
+      if(child.isMesh && child !== lastClickedObject){
+        child.material.emissive.setHex(0x000000);
+      }
+    });
   }
 }
 
@@ -465,4 +529,5 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
