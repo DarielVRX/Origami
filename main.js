@@ -240,50 +240,45 @@ function onMouseMove(event){
     const hitPoint = intersects[0].point;
     const obj = intersects[0].object;
 
-    // ======= HOVER / RESALTADO =======
-    glbModel.traverse(child => {
-      if(child.isMesh){
-        const pos = child.geometry.attributes.position;
-        let isClose = false;
-        for(let i=0;i<pos.count;i++){
-          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){
-            isClose = true;
-            break;
-          }
-        }
-
-        if(isClose){
-          if(child !== lastClickedObject){
-            child.material.emissive.setHex(0x333333); // resalte
-          }
-        } else {
-          if(child !== lastClickedObject){
-            child.material.emissive.setHex(0x000000);
-          }
+// ======= HOVER / RESALTADO =======
+glbModel.traverse(child => {
+  if(child.isMesh){
+    let shouldHighlight = false;
+    if(brushSize <= parseFloat(brushSlider.min)){
+      // mínimo: solo el objeto bajo el cursor
+      shouldHighlight = (child === hoveredObject);
+    } else {
+      // brush grande: resalta por distancia a hitPoint
+      const pos = child.geometry.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+        if(vertex.distanceTo(hitPoint) <= brushSize){
+          shouldHighlight = true;
+          break;
         }
       }
-    });
-
-    hoveredObject = obj;
-
-// ======= PINTADO =======
-if(isDrawing){
-  // Si el slider está en mínimo, pintar solo la pieza seleccionada
-  if(brushSize <= parseFloat(brushSlider.min)){
-    if(lastClickedObject){
-      lastClickedObject.material.color.set(currentColor);
-      lastClickedObject.userData.currentColor = lastClickedObject.material.color.clone();
-      if(!selectedObjects.includes(lastClickedObject)) selectedObjects.push(lastClickedObject);
     }
+    if(child !== lastClickedObject){
+      child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
+    }
+  }
+});
+
+// ======= PINTADO CONTINUO =======
+if(isDrawing && hoveredObject){
+  if(brushSize <= parseFloat(brushSlider.min)){
+    // mínimo: pinta solo el objeto bajo el cursor continuamente
+    hoveredObject.material.color.set(currentColor);
+    hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
+    if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
   } else {
-    // Brush más grande: colorea todos los vértices cercanos
+    // brush grande: pinta área
     glbModel.traverse(child => {
       if(child.isMesh){
         const pos = child.geometry.attributes.position;
         for(let i=0;i<pos.count;i++){
           const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){
+          if(vertex.distanceTo(hitPoint) <= brushSize){
             if(!child.userData.currentColor){
               child.material = child.userData.originalMaterial.clone();
             }
@@ -383,48 +378,45 @@ function onTouchHover(touchVec2){
   if(intersects.length > 0 && intersects[0].distance <= maxDistance){
     const hitPoint = intersects[0].point;
 
-    // ======= HOVER / RESALTADO =======
-    glbModel.traverse(child => {
-      if(child.isMesh){
-        const pos = child.geometry.attributes.position;
-        let isClose = false;
-        for(let i=0;i<pos.count;i++){
-          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){
-            isClose = true;
-            break;
-          }
-        }
-
-        if(isClose){
-          if(child !== lastClickedObject){
-            child.material.emissive.setHex(0x333333);
-          }
-        } else {
-          if(child !== lastClickedObject){
-            child.material.emissive.setHex(0x000000);
-          }
+// ======= HOVER / RESALTADO =======
+glbModel.traverse(child => {
+  if(child.isMesh){
+    let shouldHighlight = false;
+    if(brushSize <= parseFloat(brushSlider.min)){
+      // mínimo: solo el objeto bajo el cursor
+      shouldHighlight = (child === hoveredObject);
+    } else {
+      // brush grande: resalta por distancia a hitPoint
+      const pos = child.geometry.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+        if(vertex.distanceTo(hitPoint) <= brushSize){
+          shouldHighlight = true;
+          break;
         }
       }
-    });
-
-// ======= PINTADO =======
-if(isDrawing){
-  // Si el slider está en mínimo, pintar solo la pieza seleccionada
-  if(brushSize <= parseFloat(brushSlider.min)){
-    if(lastClickedObject){
-      lastClickedObject.material.color.set(currentColor);
-      lastClickedObject.userData.currentColor = lastClickedObject.material.color.clone();
-      if(!selectedObjects.includes(lastClickedObject)) selectedObjects.push(lastClickedObject);
     }
+    if(child !== lastClickedObject){
+      child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
+    }
+  }
+});
+
+// ======= PINTADO CONTINUO =======
+if(isDrawing && hoveredObject){
+  if(brushSize <= parseFloat(brushSlider.min)){
+    // mínimo: pinta solo el objeto bajo el cursor continuamente
+    hoveredObject.material.color.set(currentColor);
+    hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
+    if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
   } else {
-    // Brush más grande: colorea todos los vértices cercanos
+    // brush grande: pinta área
     glbModel.traverse(child => {
       if(child.isMesh){
         const pos = child.geometry.attributes.position;
         for(let i=0;i<pos.count;i++){
           const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint)<=brushSize){
+          if(vertex.distanceTo(hitPoint) <= brushSize){
             if(!child.userData.currentColor){
               child.material = child.userData.originalMaterial.clone();
             }
@@ -461,6 +453,7 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
 
 
 
