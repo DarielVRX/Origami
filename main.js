@@ -410,7 +410,7 @@ async function uploadToGitHub(arrayBuffer, filename) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// CARGAR GLB DESDE GITHUB (robusto)
+// CARGAR GLB DESDE GITHUB
 // ─────────────────────────────────────────────────────────────
 async function loadFromGitHub(filename) {
   const path = filename.endsWith('.glb') ? filename : filename + '.glb';
@@ -418,41 +418,24 @@ async function loadFromGitHub(filename) {
 
   showToast('Descargando desde GitHub…');
 
-  try {
-    const res = await fetch(apiUrl, {
-      headers: {
-        'Authorization': `Bearer ${GH_TOKEN}`,
-        'Accept': 'application/vnd.github.raw+json',
-        'X-GitHub-Api-Version': '2022-11-28'
-      }
-    });
-
-    console.log(`[GitHub] Status: ${res.status} (${res.statusText})`);
-
-    if (!res.ok) {
-      const errText = await res.text();
-      console.warn('[GitHub] Respuesta no OK:', errText);
-      showToast(`⚠️ Archivo no encontrado en GitHub: ${path}`, 5000);
-      return;
+  const res = await fetch(apiUrl, {
+    headers: {
+      'Authorization': `Bearer ${GH_TOKEN}`,
+      'Accept': 'application/vnd.github.raw+json',
+      'X-GitHub-Api-Version': '2022-11-28'
     }
+  });
 
-    // Obtiene el ArrayBuffer
-    const buffer = await res.arrayBuffer();
-    console.log(`[GitHub] buffer.byteLength = ${buffer.byteLength}`);
-
-    if (buffer.byteLength === 0) {
-      showToast(`⚠️ GLB descargado vacío: ${path}`, 5000);
-      return;
-    }
-
-    // Pasa el buffer al loader local
-    loadGLBFromBuffer(buffer, true);
-    showToast(`✅ Cargado desde GitHub: ${path}`);
-  } catch (err) {
-    console.error('[GitHub] Error descargando GLB:', err);
-    showToast(`⚠️ Error cargando desde GitHub: ${err.message}`, 5000);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `HTTP ${res.status}`);
   }
+
+  const buffer = await res.arrayBuffer();
+  loadGLBFromBuffer(buffer, true);
+  showToast(`✅ Cargado desde GitHub: ${path}`);
 }
+
 // Modal para elegir archivo de GitHub
 function askGitHubFile() {
   const overlay = document.createElement('div');
@@ -829,6 +812,7 @@ renderer.domElement.addEventListener('mouseleave', () => {
 });
 
 renderer.domElement.addEventListener('mousedown', e => {
+  closeAll();
   if (e.button !== 0 || !glbModel) return;
   const its = getIntersects(e.clientX, e.clientY);
 
@@ -855,6 +839,7 @@ renderer.domElement.addEventListener('contextmenu', e  => e.preventDefault());
 // Touch
 let touchPainting = false;
 renderer.domElement.addEventListener('touchstart', e => {
+  closeAll();
   if (e.touches.length !== 1 || !glbModel) return;
   touchPainting = true; isDrawing = true;
   const t = e.touches[0];
@@ -878,109 +863,170 @@ document.head.insertAdjacentHTML('beforeend', `<style>
   from { opacity:0; transform:translateX(-50%) translateY(10px); }
   to   { opacity:1; transform:translateX(-50%) translateY(0); }
 }
+@keyframes lockBounce {
+  0%,100% { transform:translateY(0); }
+  30%     { transform:translateY(-6px); }
+  60%     { transform:translateY(2px); }
+}
+@keyframes lockShake {
+  0%,100% { transform:rotate(0deg); }
+  25%     { transform:rotate(-12deg); }
+  75%     { transform:rotate(12deg); }
+}
 * { box-sizing:border-box; margin:0; padding:0; }
+body { overflow:hidden; }
 
-.top-btn {
-  position:fixed; top:12px; z-index:2000;
-  width:132px; height:132px;
-  background:rgba(20,20,20,0.85); border:1px solid rgba(255,255,255,0.15);
-  border-radius:16px; cursor:pointer;
+/* ── Botón base inferior ── */
+.fab {
+  width:88px; height:88px; border-radius:50%;
+  background:rgba(20,20,20,0.88);
+  border:1px solid rgba(255,255,255,0.18);
+  backdrop-filter:blur(10px);
   display:flex; align-items:center; justify-content:center;
-  backdrop-filter:blur(6px); transition:background 0.2s;
-  color:#fff; font-size:54px; user-select:none;
+  cursor:pointer; user-select:none;
+  font-size:36px; color:#fff;
+  transition:background 0.2s, transform 0.2s;
+  position:relative;
 }
-.top-btn:hover { background:rgba(40,40,40,0.95); }
+.fab:hover { background:rgba(50,50,50,0.95); transform:scale(1.07); }
+.fab:active { transform:scale(0.95); }
 
-#hamburger-btn { left:12px; flex-direction:column; gap:5px; }
-#hamburger-btn span {
-  display:block; width:60px; height:5px;
-  background:#fff; border-radius:2px;
-  transition:transform 0.25s, opacity 0.25s;
+/* ── Grupo inferior derecho ── */
+#fab-group {
+  position:fixed; bottom:24px; right:24px;
+  z-index:2000;
+  display:flex; flex-direction:column; align-items:center; gap:14px;
 }
-#hamburger-btn.open span:nth-child(1) { transform:translateY(21px) rotate(45deg); }
-#hamburger-btn.open span:nth-child(2) { opacity:0; }
-#hamburger-btn.open span:nth-child(3) { transform:translateY(-21px) rotate(-45deg); }
 
-#brush-toggle-btn { left:154px; }
+/* ── Botón + (agrupador) ── */
+#fab-main {
+  font-size:48px; font-weight:300; line-height:1;
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1), background 0.2s;
+}
+#fab-main.open { transform:rotate(45deg) scale(1.07); }
 
+/* ── Hijos expandibles ── */
+#fab-children {
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  overflow:hidden;
+  max-height:0; opacity:0;
+  transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+}
+#fab-children.open {
+  max-height:400px; opacity:1;
+}
+/* tooltip al hover */
+.fab[data-tip] { position:relative; }
+.fab[data-tip]::after {
+  content:attr(data-tip);
+  position:absolute; right:calc(100% + 12px); top:50%;
+  transform:translateY(-50%);
+  background:rgba(10,10,10,0.92); color:#eee;
+  font-family:'Courier New',monospace; font-size:13px;
+  padding:6px 12px; border-radius:6px; white-space:nowrap;
+  pointer-events:none; opacity:0;
+  transition:opacity 0.15s;
+  border:1px solid rgba(255,255,255,0.1);
+}
+.fab[data-tip]:hover::after { opacity:1; }
+
+/* ── Candado ── */
+#fab-lock {
+  font-size:36px;
+}
+#fab-lock.locked {
+  background:rgba(255,80,80,0.2);
+  border-color:rgba(255,80,80,0.5);
+  color:#ff6b6b;
+}
+#fab-lock.locked .lock-icon { animation:lockShake 0.4s ease; }
+#fab-lock.unlocked .lock-icon { animation:lockBounce 0.4s ease; }
+
+/* ── Drawer lateral ── */
 #side-menu {
   position:fixed; top:0; left:0; width:360px; height:100vh;
-  background:rgba(18,18,18,0.96); backdrop-filter:blur(12px);
+  background:rgba(18,18,18,0.97); backdrop-filter:blur(14px);
   z-index:1900; display:flex; flex-direction:column;
-  padding:160px 16px 24px; gap:10px;
+  padding:40px 16px 24px; gap:10px;
   transform:translateX(-100%);
   transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
   border-right:1px solid rgba(255,255,255,0.08);
   overflow-y:auto;
 }
 #side-menu.open { transform:translateX(0); }
-
 .menu-label {
-  font-family:'Courier New',monospace; font-size:14px;
+  font-family:'Courier New',monospace; font-size:11px;
   letter-spacing:2px; text-transform:uppercase;
-  color:rgba(255,255,255,0.35); margin:8px 0 2px; padding-left:4px;
+  color:rgba(255,255,255,0.3); margin:10px 0 2px; padding-left:4px;
 }
 .menu-btn {
-  width:100%; padding:20px 22px;
-  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
-  border-radius:6px; color:#e8e8e8;
-  font-family:'Courier New',monospace; font-size:13px;
+  width:100%; padding:16px 18px;
+  background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.08);
+  border-radius:8px; color:#e8e8e8;
+  font-family:'Courier New',monospace; font-size:14px;
   cursor:pointer; text-align:left;
   transition:background 0.15s, border-color 0.15s;
-  display:flex; align-items:center; gap:10px;
+  display:flex; align-items:center; gap:12px;
 }
-.menu-btn:hover  { background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.25); }
-.menu-btn.active { background:rgba(255,80,80,0.2); border-color:rgba(255,80,80,0.5); color:#ff6b6b; }
-#load-glb-input { display:none; }
-label.menu-btn  { user-select:none; }
+.menu-btn:hover  { background:rgba(255,255,255,0.12); border-color:rgba(255,255,255,0.22); }
+.menu-btn.active { background:rgba(255,80,80,0.18); border-color:rgba(255,80,80,0.45); color:#ff6b6b; }
+#load-glb-input  { display:none; }
+label.menu-btn   { user-select:none; }
 
+/* ── Panel pincel ── */
 #brush-panel {
-  position:fixed; top:160px; left:12px; z-index:1800;
-  background:rgba(18,18,18,0.92); border:1px solid rgba(255,255,255,0.1);
-  border-radius:10px; padding:14px 18px;
-  display:none; flex-direction:column; gap:10px;
-  backdrop-filter:blur(8px); min-width:320px;
+  position:fixed; bottom:130px; right:130px; z-index:1800;
+  background:rgba(18,18,18,0.94); border:1px solid rgba(255,255,255,0.12);
+  border-radius:12px; padding:18px 22px;
+  display:none; flex-direction:column; gap:12px;
+  backdrop-filter:blur(10px); min-width:280px;
 }
 #brush-panel.visible { display:flex; }
 #brush-panel label {
-  font-family:'Courier New',monospace; font-size:16px;
-  letter-spacing:1px; color:rgba(255,255,255,0.5); text-transform:uppercase;
+  font-family:'Courier New',monospace; font-size:12px;
+  letter-spacing:1px; color:rgba(255,255,255,0.45); text-transform:uppercase;
 }
-#brush-panel input[type=range] { width:100%; accent-color:#ff4444; }
+#brush-panel input[type=range] { width:100%; accent-color:#ff4444; cursor:pointer; }
 #brush-size-display {
-  font-family:'Courier New',monospace; font-size:18px;
-  color:rgba(255,255,255,0.55); text-align:right;
+  font-family:'Courier New',monospace; font-size:14px;
+  color:rgba(255,255,255,0.5); text-align:right;
 }
 
+/* ── Cursor pincel ── */
 #brush-circle {
   position:fixed; border:2px solid rgba(255,60,60,0.85); border-radius:50%;
   pointer-events:none; opacity:0; transition:opacity 0.2s;
 }
 
-#palette-wrapper {
-  position:fixed; bottom:14px; right:14px; z-index:1000;
-  display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+/* ── Paleta ── */
+#palette-popup {
+  position:fixed; bottom:130px; right:130px; z-index:1800;
+  display:none; flex-direction:column; align-items:flex-end; gap:10px;
 }
-#current-color-btn {
-  width:132px; height:132px; border-radius:16px;
-  border:2px solid rgba(255,255,255,0.3); cursor:pointer;
-  box-shadow:0 2px 12px rgba(0,0,0,0.4); transition:transform 0.15s;
+#palette-popup.visible { display:flex; }
+
+#current-color-preview {
+  width:56px; height:56px; border-radius:12px;
+  border:2px solid rgba(255,255,255,0.35); cursor:pointer;
+  box-shadow:0 2px 12px rgba(0,0,0,0.5);
+  transition:transform 0.15s;
 }
-#current-color-btn:hover { transform:scale(1.08); }
+#current-color-preview:hover { transform:scale(1.08); }
 
 #palette-div {
-  display:none; background:rgba(18,18,18,0.95);
-  border:1px solid rgba(255,255,255,0.1); border-radius:10px;
-  padding:14px; grid-template-columns:repeat(6,1fr); gap:8px;
-  max-height:60vh; overflow-y:auto; backdrop-filter:blur(10px);
+  background:rgba(18,18,18,0.97);
+  border:1px solid rgba(255,255,255,0.1); border-radius:12px;
+  padding:12px; grid-template-columns:repeat(6,1fr); gap:7px;
+  max-height:55vh; overflow-y:auto; backdrop-filter:blur(12px);
+  display:none;
 }
 #palette-div.visible { display:grid; }
 
 #eyedropper-btn {
-  grid-column:span 6; padding:8px;
-  background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15);
+  grid-column:span 6; padding:9px;
+  background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.13);
   border-radius:6px; color:#ccc;
-  font-family:'Courier New',monospace; font-size:18px; cursor:pointer;
+  font-family:'Courier New',monospace; font-size:13px; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
   gap:6px; letter-spacing:1px; text-transform:uppercase;
   transition:background 0.15s, border-color 0.15s, color 0.15s;
@@ -989,78 +1035,40 @@ label.menu-btn  { user-select:none; }
 #eyedropper-btn.active { background:rgba(255,220,80,0.25); border-color:#ffd84f; color:#ffd84f; }
 
 .color-swatch {
-  width:52px; height:52px; border-radius:8px; cursor:pointer;
-  border:1px solid rgba(255,255,255,0.05);
+  width:40px; height:40px; border-radius:6px; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.04);
   transition:transform 0.1s, outline 0.1s;
 }
-.color-swatch:hover { transform:scale(1.2); outline:2px solid #ffd84f; }
+.color-swatch:hover { transform:scale(1.18); outline:2px solid #ffd84f; }
 
 body.eyedropper-cursor * { cursor:crosshair !important; }
-
-body.eyedropper-cursor * { cursor:crosshair !important; }
-
-body.eyedropper-cursor * { cursor:crosshair !important; }
-
-body.eyedropper-cursor * { cursor:crosshair !important; }
-
-/* Movil — clases aplicadas via JS con deteccion de touch */
-body.is-touch .top-btn {
-  width:80px !important; height:80px !important; font-size:32px !important;
-  top:16px !important; border-radius:14px !important;
-}
-body.is-touch #hamburger-btn { left:16px !important; }
-body.is-touch #hamburger-btn span { width:34px !important; height:3px !important; }
-body.is-touch #brush-toggle-btn { left:112px !important; }
-body.is-touch #side-menu { width:300px !important; padding:110px 20px 30px !important; }
-body.is-touch .menu-btn { padding:20px 18px !important; font-size:18px !important; min-height:64px !important; }
-body.is-touch .menu-label { font-size:13px !important; margin-top:12px !important; }
-body.is-touch #brush-panel { top:112px !important; left:16px !important; min-width:280px !important; padding:20px 24px !important; }
-body.is-touch #brush-panel label { font-size:14px !important; }
-body.is-touch #brush-panel input[type=range] { height:32px !important; }
-body.is-touch #brush-size-display { font-size:15px !important; }
-body.is-touch #current-color-btn { width:80px !important; height:80px !important; border-radius:14px !important; }
-body.is-touch .color-swatch { width:42px !important; height:42px !important; border-radius:8px !important; }
-body.is-touch #palette-div { gap:8px !important; padding:14px !important; }
-body.is-touch #eyedropper-btn { padding:14px !important; font-size:15px !important; }
-</style>`);
+</style>\`);
 
 // ─────────────────────────────────────────────────────────────
 // UI CONSTRUCTION
 // ─────────────────────────────────────────────────────────────
 
-// Hamburger
-const hamburgerBtn = document.createElement('div');
-hamburgerBtn.id = 'hamburger-btn'; hamburgerBtn.className = 'top-btn';
-hamburgerBtn.innerHTML = '<span></span><span></span><span></span>';
-document.body.appendChild(hamburgerBtn);
-
+// ── Drawer lateral (sideMenu) ──
 const sideMenu = document.createElement('div');
 sideMenu.id = 'side-menu';
 document.body.appendChild(sideMenu);
-
-const closeMenu = () => { sideMenu.classList.remove('open'); hamburgerBtn.classList.remove('open'); };
-hamburgerBtn.addEventListener('click', () => { hamburgerBtn.classList.toggle('open'); sideMenu.classList.toggle('open'); });
-document.addEventListener('click', e => {
-  if (sideMenu.classList.contains('open') && !sideMenu.contains(e.target) && !hamburgerBtn.contains(e.target)) closeMenu();
-});
 
 function addLabel(text) {
   const el = document.createElement('div');
   el.className = 'menu-label'; el.textContent = text;
   sideMenu.appendChild(el);
 }
-function addBtn(icon, label, cb) {
+function addMenuBtn(icon, label, cb) {
   const btn = document.createElement('button');
   btn.className = 'menu-btn';
-  btn.innerHTML = `<span>${icon}</span>${label}`;
+  btn.innerHTML = \`<span>\${icon}</span>\${label}\`;
   btn.addEventListener('click', () => cb(btn));
   sideMenu.appendChild(btn);
   return btn;
 }
 
-// Archivo
 addLabel('GitHub');
-addBtn('☁️', 'Cargar desde GitHub', () => { closeMenu(); askGitHubFile(); });
+addMenuBtn('☁️', 'Cargar desde GitHub',   () => { closeAll(); askGitHubFile(); });
 
 addLabel('Archivo');
 const loadInput = document.createElement('input');
@@ -1068,30 +1076,80 @@ loadInput.type = 'file'; loadInput.accept = '.glb'; loadInput.id = 'load-glb-inp
 sideMenu.appendChild(loadInput);
 const loadLabel = document.createElement('label');
 loadLabel.htmlFor = 'load-glb-input'; loadLabel.className = 'menu-btn';
-loadLabel.innerHTML = '<span>📂</span>Cargar';
+loadLabel.innerHTML = '<span>📂</span>Cargar archivo local';
 sideMenu.appendChild(loadLabel);
-loadInput.addEventListener('change', e => { if (e.target.files.length) loadGLBFromFile(e.target.files[0]); closeMenu(); });
-
-// Exportar
-addLabel('Exportar');
-addBtn('🖼', 'Exportar Imagen 2×2', () => { closeMenu(); askFilename('collage_2x2', doExportImage); });
-addBtn('📦', 'Exportar GLB → GitHub', () => { closeMenu(); askFilename('ModeloGLB', name => doExportGLB(name)); });
-
-// Cámara
-addLabel('Cámara');
-addBtn('🔓', 'Bloquear Cámara', btn => {
-  cameraLocked = !cameraLocked;
-  controls.enableRotate = !cameraLocked;
-  btn.innerHTML = `<span>${cameraLocked ? '🔒' : '🔓'}</span>${cameraLocked ? 'Desbloquear Cámara' : 'Bloquear Cámara'}`;
-  btn.classList.toggle('active', cameraLocked);
+loadInput.addEventListener('change', e => {
+  if (e.target.files.length) loadGLBFromFile(e.target.files[0]);
+  closeAll();
 });
 
-// Pincel
-const brushToggleBtn = document.createElement('div');
-brushToggleBtn.id = 'brush-toggle-btn'; brushToggleBtn.className = 'top-btn';
-brushToggleBtn.title = 'Tamaño de pincel'; brushToggleBtn.textContent = '✏️';
-document.body.appendChild(brushToggleBtn);
+addLabel('Exportar');
+addMenuBtn('🖼️', 'Exportar Imagen 2×2',    () => { closeAll(); askFilename('collage_2x2', doExportImage); });
+addMenuBtn('📦', 'Exportar GLB → GitHub',  () => { closeAll(); askFilename('ModeloGLB', name => doExportGLB(name)); });
 
+// ── FAB group ──
+const fabGroup = document.createElement('div');
+fabGroup.id = 'fab-group';
+document.body.appendChild(fabGroup);
+
+// Candado
+const fabLock = document.createElement('div');
+fabLock.id = 'fab-lock'; fabLock.className = 'fab';
+fabLock.setAttribute('data-tip', 'Bloquear cámara');
+fabLock.innerHTML = '<span class="lock-icon">🔓</span>';
+fabGroup.appendChild(fabLock);
+
+fabLock.addEventListener('click', e => {
+  e.stopPropagation();
+  cameraLocked = !cameraLocked;
+  controls.enableRotate = !cameraLocked;
+  fabLock.querySelector('.lock-icon').textContent = cameraLocked ? '🔒' : '🔓';
+  fabLock.setAttribute('data-tip', cameraLocked ? 'Desbloquear cámara' : 'Bloquear cámara');
+  fabLock.classList.toggle('locked', cameraLocked);
+  fabLock.classList.toggle('unlocked', !cameraLocked);
+  // Re-trigger animation
+  const icon = fabLock.querySelector('.lock-icon');
+  icon.style.animation = 'none';
+  requestAnimationFrame(() => {
+    icon.style.animation = cameraLocked ? 'lockShake 0.4s ease' : 'lockBounce 0.4s ease';
+  });
+});
+
+// Botón + principal
+const fabMain = document.createElement('div');
+fabMain.id = 'fab-main'; fabMain.className = 'fab';
+fabMain.textContent = '+';
+fabGroup.appendChild(fabMain);
+
+// Hijos del +
+const fabChildren = document.createElement('div');
+fabChildren.id = 'fab-children';
+fabGroup.insertBefore(fabChildren, fabMain);
+
+// Función para crear hijo FAB
+function makeFabChild(icon, tip) {
+  const btn = document.createElement('div');
+  btn.className = 'fab';
+  btn.setAttribute('data-tip', tip);
+  btn.textContent = icon;
+  fabChildren.appendChild(btn);
+  return btn;
+}
+
+const fabMenu    = makeFabChild('☰', 'Menú');
+const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
+const fabPalette = makeFabChild('🎨', 'Paleta de colores');
+
+// Toggle expand/collapse
+let fabOpen = false;
+function toggleFab() {
+  fabOpen = !fabOpen;
+  fabMain.classList.toggle('open', fabOpen);
+  fabChildren.classList.toggle('open', fabOpen);
+}
+fabMain.addEventListener('click', e => { e.stopPropagation(); toggleFab(); });
+
+// ── Panel pincel ──
 const brushPanel = document.createElement('div');
 brushPanel.id = 'brush-panel'; document.body.appendChild(brushPanel);
 
@@ -1102,38 +1160,42 @@ const brushSizeDisplay = document.createElement('div');
 brushSizeDisplay.id = 'brush-size-display'; brushSizeDisplay.textContent = 'Tamaño: 1';
 brushPanel.append(brushLabel, brushSlider, brushSizeDisplay);
 
+brushSlider.addEventListener('input', () => {
+  brushSize = parseFloat(brushSlider.value);
+  brushSizeDisplay.textContent = \`Tamaño: \${brushSize}\`;
+});
+brushSlider.addEventListener('change', () => { brushPanel.classList.remove('visible'); });
+
 const brushCircle = document.createElement('div');
 brushCircle.id = 'brush-circle'; document.body.appendChild(brushCircle);
 
-brushToggleBtn.addEventListener('click', () => brushPanel.classList.toggle('visible'));
-brushSlider.addEventListener('input', () => {
-  brushSize = parseFloat(brushSlider.value);
-  brushSizeDisplay.textContent = `Tamaño: ${brushSize}`;
-});
-// Cerrar panel al soltar el slider
-brushSlider.addEventListener('change', () => {
-  brushPanel.classList.remove('visible');
-});
-
-// Paleta
+// ── Paleta ──
 function hslToHex(h, s, l) {
   s /= 100; l /= 100;
   const k = n => (n + h / 30) % 12;
   const a = s * Math.min(l, 1 - l);
   const f = n => Math.round(255 * (l - a * Math.max(Math.min(k(n)-3, 9-k(n), 1), -1))).toString(16).padStart(2, '0');
-  return `#${f(0)}${f(8)}${f(4)}`;
+  return \`#\${f(0)}\${f(8)}\${f(4)}\`;
 }
 
-const paletteWrapper = document.createElement('div'); paletteWrapper.id = 'palette-wrapper';
-document.body.appendChild(paletteWrapper);
+const palettePopup = document.createElement('div'); palettePopup.id = 'palette-popup';
+document.body.appendChild(palettePopup);
 
-const currentColorBtn = document.createElement('div');
-currentColorBtn.id = 'current-color-btn'; currentColorBtn.style.background = currentColor;
-currentColorBtn.title = 'Abrir paleta'; paletteWrapper.appendChild(currentColorBtn);
+const currentColorPreview = document.createElement('div');
+currentColorPreview.id = 'current-color-preview';
+currentColorPreview.style.background = currentColor;
+palettePopup.appendChild(currentColorPreview);
 
 const paletteDiv = document.createElement('div'); paletteDiv.id = 'palette-div';
-paletteWrapper.appendChild(paletteDiv);
-currentColorBtn.addEventListener('click', () => paletteDiv.classList.toggle('visible'));
+palettePopup.appendChild(paletteDiv);
+
+// Alias para compatibilidad con código existente (eyedropper usa currentColorBtn)
+const currentColorBtn = currentColorPreview;
+
+currentColorPreview.addEventListener('click', e => {
+  e.stopPropagation();
+  paletteDiv.classList.toggle('visible');
+});
 
 const eyedropperBtn = document.createElement('button');
 eyedropperBtn.id = 'eyedropper-btn'; eyedropperBtn.innerHTML = '💉 Gotero';
@@ -1155,12 +1217,57 @@ eyedropperBtn.addEventListener('click', () => {
   const sw = document.createElement('div');
   sw.className = 'color-swatch'; sw.style.background = color; sw.title = color;
   sw.addEventListener('click', () => {
-    currentColor = color; currentColorBtn.style.background = color;
+    currentColor = color;
+    currentColorPreview.style.background = color;
     paletteDiv.classList.remove('visible');
   });
   paletteDiv.appendChild(sw);
 });
 
+// ── Acciones de los hijos FAB ──
+fabMenu.addEventListener('click', e => {
+  e.stopPropagation();
+  const isOpen = sideMenu.classList.contains('open');
+  closeAll();
+  if (!isOpen) sideMenu.classList.add('open');
+});
+
+fabBrush.addEventListener('click', e => {
+  e.stopPropagation();
+  const isOpen = brushPanel.classList.contains('visible');
+  closeAll();
+  if (!isOpen) {
+    brushPanel.classList.add('visible');
+    fabOpen = true;
+    fabMain.classList.add('open');
+    fabChildren.classList.add('open');
+  }
+});
+
+fabPalette.addEventListener('click', e => {
+  e.stopPropagation();
+  const isOpen = palettePopup.classList.contains('visible');
+  closeAll();
+  if (!isOpen) {
+    palettePopup.classList.add('visible');
+    fabOpen = true;
+    fabMain.classList.add('open');
+    fabChildren.classList.add('open');
+  }
+});
+
+// ── closeAll: cierra todo al clic en escena ──
+function closeAll() {
+  sideMenu.classList.remove('open');
+  brushPanel.classList.remove('visible');
+  palettePopup.classList.remove('visible');
+  paletteDiv.classList.remove('visible');
+  fabOpen = false;
+  fabMain.classList.remove('open');
+  fabChildren.classList.remove('open');
+}
+
+// Clic en escena → cerrar todo
 // ─────────────────────────────────────────────────────────────
 // LOOP
 // ─────────────────────────────────────────────────────────────
@@ -1169,5 +1276,3 @@ eyedropperBtn.addEventListener('click', () => {
   controls.update();
   renderer.render(scene, camera);
 })();
-
-
