@@ -91,18 +91,6 @@ paletteWrapper.style.flexDirection='column';
 paletteWrapper.style.alignItems='center';
 document.body.appendChild(paletteWrapper);
 
-// Botón toggle paleta
-const paletteToggleBtn = document.createElement('button');
-paletteToggleBtn.innerHTML='&#x1F308;'; // icono arcoiris
-paletteToggleBtn.style.fontSize='1.5em';
-paletteToggleBtn.style.width='40px';
-paletteToggleBtn.style.height='40px';
-paletteToggleBtn.style.borderRadius='6px';
-paletteToggleBtn.style.cursor='pointer';
-paletteToggleBtn.style.border='2px solid #000';
-paletteToggleBtn.style.background='#fff';
-paletteWrapper.appendChild(paletteToggleBtn);
-
 // Botón color actual
 const currentColorBtn = document.createElement('div');
 currentColorBtn.style.width='40px';
@@ -111,6 +99,7 @@ currentColorBtn.style.borderRadius='6px';
 currentColorBtn.style.border='2px solid #000';
 currentColorBtn.style.background=currentColor;
 currentColorBtn.style.cursor='pointer';
+currentColorBtn.title='Click para abrir la paleta';
 currentColorBtn.style.display='flex';
 currentColorBtn.style.alignItems='center';
 currentColorBtn.style.justifyContent='center';
@@ -131,8 +120,9 @@ paletteDiv.style.maxHeight='60vh';
 paletteDiv.style.overflowY='auto';
 paletteWrapper.appendChild(paletteDiv);
 
-paletteToggleBtn.addEventListener('click',()=>{
-    paletteDiv.style.display = paletteDiv.style.display==='none'?'grid':'none';
+// Mostrar/ocultar paleta
+currentColorBtn.addEventListener('click',()=>{
+  paletteDiv.style.display = paletteDiv.style.display==='none'?'grid':'none';
 });
 
 // Crear colores
@@ -150,44 +140,20 @@ colors.forEach(color=>{
   paletteDiv.appendChild(btn);
 });
 
-// ===================== SLIDER COLLAPSABLE =====================
-const sliderWrapper = document.createElement('div');
-sliderWrapper.style.position='fixed';
-sliderWrapper.style.top='10px';
-sliderWrapper.style.right='10px';
-sliderWrapper.style.zIndex=1000;
-sliderWrapper.style.display='flex';
-sliderWrapper.style.flexDirection='column';
-sliderWrapper.style.alignItems='center';
-document.body.appendChild(sliderWrapper);
-
-// Botón toggle slider
-const sliderBtn = document.createElement('button');
-sliderBtn.innerHTML='&#x1F39A;'; // icono estilo "slider"
-sliderBtn.style.fontSize='1.5em';
-sliderBtn.style.width='40px';
-sliderBtn.style.height='40px';
-sliderBtn.style.borderRadius='6px';
-sliderBtn.style.cursor='pointer';
-sliderBtn.style.border='2px solid #000';
-sliderBtn.style.background='#fff';
-sliderBtn.style.marginBottom='5px';
-sliderWrapper.appendChild(sliderBtn);
-
-// Slider oculto por defecto
+// ===================== SLIDER PUNTERO =====================
+const brushSlider = document.createElement('input');
 brushSlider.type='range';
 brushSlider.min='1';
 brushSlider.max='10';
 brushSlider.value='1';
-brushSlider.style.width='100px';
-brushSlider.style.display='none';
-sliderWrapper.appendChild(brushSlider);
+brushSlider.style.position='fixed';
+brushSlider.style.top='20px';
+brushSlider.style.left='50%';
+brushSlider.style.transform='translateX(-50%)';
+brushSlider.style.zIndex=1000;
+brushSlider.style.width='1000px';
+document.body.appendChild(brushSlider);
 
-sliderBtn.addEventListener('click',()=> {
-    brushSlider.style.display = brushSlider.style.display==='none'?'block':'none';
-});
-
-// Slider puntero circle
 const brushCircle = document.createElement('div');
 brushCircle.style.position='fixed';
 brushCircle.style.border='2px solid red';
@@ -241,40 +207,39 @@ cameraLockBtn.style.zIndex=1000;
 document.body.appendChild(cameraLockBtn);
 
 // ===================== CARGA DE GLB =====================
-const loadBtnWrapperGLB = document.createElement('div');
-loadBtnWrapperGLB.style.position='fixed';
-loadBtnWrapperGLB.style.top='60px';
-loadBtnWrapperGLB.style.right='10px';
-loadBtnWrapperGLB.style.zIndex=1000;
-document.body.appendChild(loadBtnWrapperGLB);
-
-// Botón hamburguesa para toggle input
-const loadHamburgerBtn = document.createElement('button');
-loadHamburgerBtn.innerHTML='&#9776;';
-loadHamburgerBtn.style.fontSize='1.5em';
-loadHamburgerBtn.style.width='40px';
-loadHamburgerBtn.style.height='40px';
-loadHamburgerBtn.style.borderRadius='6px';
-loadHamburgerBtn.style.cursor='pointer';
-loadHamburgerBtn.style.border='2px solid #000';
-loadHamburgerBtn.style.background='#fff';
-loadBtnWrapperGLB.appendChild(loadHamburgerBtn);
-
-// Input oculto
-const loadFileInput = document.createElement('input');
-loadFileInput.type='file';
-loadFileInput.accept='.glb';
-loadFileInput.style.display='none';
-loadBtnWrapperGLB.appendChild(loadFileInput);
-
-// Toggle input
-loadHamburgerBtn.addEventListener('click',()=>{
-    loadFileInput.style.display = loadFileInput.style.display==='none'?'block':'none';
-});
-
-loadFileInput.addEventListener('change', (e)=>{
+const loadBtn = document.createElement('input');
+loadBtn.type='file';
+loadBtn.accept='.glb';
+loadBtn.style.position='fixed';
+loadBtn.style.top='10px';
+loadBtn.style.left='10px';
+loadBtn.style.zIndex=1000;
+document.body.appendChild(loadBtn);
+loadBtn.addEventListener('change', (e)=>{
     if(e.target.files.length>0) loadGLB(e.target.files[0]);
 });
+
+function loadGLB(file){
+    const url = URL.createObjectURL(file);
+    loader.load(url, (gltf)=>{
+        if(glbModel) scene.remove(glbModel);
+        glbModel = gltf.scene;
+        glbModel.scale.set(0.5,0.5,0.5);
+        glbModel.position.set(0,0,0);
+        glbModel.traverse(child=>{
+            if(child.isMesh){
+                child.material = baseMaterial.clone();
+                child.userData.originalMaterial = child.material.clone();
+                child.geometry.computeBoundingSphere();
+            }
+        });
+        scene.add(glbModel);
+        const box = new THREE.Box3().setFromObject(glbModel);
+        const center = box.getCenter(new THREE.Vector3());
+        controls.target.copy(center);
+        controls.update();
+    });
+}
 
 // ===================== INTERACCIONES =====================
 renderer.domElement.addEventListener('mousemove',onMouseMove);
@@ -286,11 +251,14 @@ renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
 function handleHoverAndPaint(intersects){
   if(intersects.length===0){
     if(!glbModel) return;
-    glbModel.traverse(child=>{ if(child.isMesh && child!==lastClickedObject) child.material.emissiveIntensity=0; });
+    glbModel.traverse(child=>{
+      if(child.isMesh && child!==lastClickedObject) child.material.emissiveIntensity=0;
+    });
     return;
   }
   const hitPoint=intersects[0].point;
   hoveredObject=intersects[0].object;
+
   glbModel.traverse(child=>{
     if(child.isMesh){
       let shouldHighlight=false;
@@ -308,6 +276,7 @@ function handleHoverAndPaint(intersects){
       }
     }
   });
+
   if(isDrawing && hoveredObject){
     if(brushSize<=parseFloat(brushSlider.min)){
       hoveredObject.material.color.set(currentColor);
@@ -368,7 +337,6 @@ function onMouseDown(event){
 }
 
 // ===================== EVENTOS BOTONES =====================
-let cameraLocked=false;
 cameraLockBtn.addEventListener('click', ()=>{
   cameraLocked=!cameraLocked;
   controls.enableRotate=!cameraLocked;
@@ -379,7 +347,8 @@ exportImgBtn.addEventListener('click',()=>{
   if(!glbModel) return alert("No hay modelo cargado");
   const positions=[ new THREE.Vector3(0,22,70), new THREE.Vector3(0,22,-70), new THREE.Vector3(70,22,0), new THREE.Vector3(-70,22,0) ];
   const size=4096; const gap=10; const totalSize=size*2+gap;
-  const canvas=document.createElement('canvas'); canvas.width=totalSize; canvas.height=totalSize;
+  const canvas=document.createElement('canvas');
+  canvas.width=totalSize; canvas.height=totalSize;
   const ctx=canvas.getContext('2d');
   const originalPos=camera.position.clone();
   const originalTarget=controls.target.clone();
