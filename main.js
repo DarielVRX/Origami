@@ -210,15 +210,12 @@ document.body.appendChild(cameraLockBtn);
 
 cameraLockBtn.addEventListener('click', () => {
   cameraLocked = !cameraLocked;
-
-  // Solo deshabilitar rotación y pan, pero mantener zoom y updates para raycaster
   controls.enableRotate = !cameraLocked;
   cameraLockBtn.textContent = cameraLocked ? "Desbloquear Cámara" : "Bloquear Cámara";
 });
 
 // ================= INTERACCIONES ================= 
 const maxDistance = 80;
-
 renderer.domElement.addEventListener('mousemove',onMouseMove);
 renderer.domElement.addEventListener('mousedown',onMouseDown);
 renderer.domElement.addEventListener('mouseup',()=>isDrawing=false);
@@ -236,65 +233,61 @@ function onMouseMove(event){
   raycaster.setFromCamera(mouse,camera);
   const intersects = raycaster.intersectObjects(glbModel.children,true);
 
+  hoveredObject = intersects.length>0 ? intersects[0].object : null;
+
   if(intersects.length > 0 && intersects[0].distance <= maxDistance){
     const hitPoint = intersects[0].point;
-    const obj = intersects[0].object;
 
-// ======= HOVER / RESALTADO =======
-glbModel.traverse(child => {
-  if(child.isMesh){
-    let shouldHighlight = false;
-    if(brushSize <= parseFloat(brushSlider.min)){
-      // mínimo: solo el objeto bajo el cursor
-      shouldHighlight = (child === hoveredObject);
-    } else {
-      // brush grande: resalta por distancia a hitPoint
-      const pos = child.geometry.attributes.position;
-      for(let i=0;i<pos.count;i++){
-        const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-        if(vertex.distanceTo(hitPoint) <= brushSize){
-          shouldHighlight = true;
-          break;
-        }
-      }
-    }
-    if(child !== lastClickedObject){
-      child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
-    }
-  }
-});
-
-// ======= PINTADO CONTINUO =======
-if(isDrawing && hoveredObject){
-  if(brushSize <= parseFloat(brushSlider.min)){
-    // mínimo: pinta solo el objeto bajo el cursor continuamente
-    hoveredObject.material.color.set(currentColor);
-    hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
-    if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
-  } else {
-    // brush grande: pinta área
+    // ======= HOVER / RESALTADO =======
     glbModel.traverse(child => {
       if(child.isMesh){
-        const pos = child.geometry.attributes.position;
-        for(let i=0;i<pos.count;i++){
-          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint) <= brushSize){
-            if(!child.userData.currentColor){
-              child.material = child.userData.originalMaterial.clone();
+        let shouldHighlight = false;
+        if(brushSize <= parseFloat(brushSlider.min)){
+          shouldHighlight = (child === hoveredObject);
+        } else {
+          const pos = child.geometry.attributes.position;
+          for(let i=0;i<pos.count;i++){
+            const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+            if(vertex.distanceTo(hitPoint) <= brushSize){
+              shouldHighlight = true;
+              break;
             }
-            child.material.color.set(currentColor);
-            child.userData.currentColor = child.material.color.clone();
-            if(!selectedObjects.includes(child)) selectedObjects.push(child);
-            break;
           }
+        }
+        if(child !== lastClickedObject){
+          child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
         }
       }
     });
-  }
-}
+
+    // ======= PINTADO CONTINUO =======
+    if(isDrawing && hoveredObject){
+      if(brushSize <= parseFloat(brushSlider.min)){
+        hoveredObject.material.color.set(currentColor);
+        hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
+        if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
+      } else {
+        glbModel.traverse(child => {
+          if(child.isMesh){
+            const pos = child.geometry.attributes.position;
+            for(let i=0;i<pos.count;i++){
+              const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+              if(vertex.distanceTo(hitPoint) <= brushSize){
+                if(!child.userData.currentColor){
+                  child.material = child.userData.originalMaterial.clone();
+                }
+                child.material.color.set(currentColor);
+                child.userData.currentColor = child.material.color.clone();
+                if(!selectedObjects.includes(child)) selectedObjects.push(child);
+                break;
+              }
+            }
+          }
+        });
+      }
+    }
 
   } else {
-    hoveredObject = null;
     glbModel.traverse(child => {
       if(child.isMesh && child!==lastClickedObject){
         child.material.emissive.setHex(0x000000);
@@ -307,7 +300,6 @@ function onMouseDown(event){
   if(event.button===0){
     isDrawing = true;
 
-    // Raycast para detectar objeto bajo el mouse
     mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
@@ -316,35 +308,27 @@ function onMouseDown(event){
 
     if(intersects.length > 0){
       if(lastClickedObject && lastClickedObject !== intersects[0].object){
-        // Restaurar emissive del último clic
         lastClickedObject.material.emissive.setHex(0x000000);
       }
       lastClickedObject = intersects[0].object;
-      lastClickedObject.material.emissive.setHex(0x555555); // resalte de selección
+      lastClickedObject.material.emissive.setHex(0x555555);
     }
 
-    // Llamar a onMouseMove para pintar si es necesario
     onMouseMove(event);
   }
 }
+
 // ================= INTERACCIONES TÁCTILES =================
 renderer.domElement.addEventListener('touchstart', (event) => {
   if (!glbModel) return;
-
   if (event.touches.length === 1) {
-    // Un dedo: dibujar
     isDrawing = true;
-
-    // Actualizar posición del touch como mouse
     const touch = event.touches[0];
     mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-
     onTouchHover(mouse);
   }
-  // Dos dedos: orbitar y zoom
   if (event.touches.length === 2) {
-    // Activamos controles para zoom/pinch
     controls.enableRotate = !cameraLocked;
     controls.enableZoom = true;
   }
@@ -356,80 +340,70 @@ renderer.domElement.addEventListener('touchmove', (event) => {
     const touch = event.touches[0];
     mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
     mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
-
     onTouchHover(mouse);
-
     brushCircle.style.left = touch.clientX - brushCircle.offsetWidth / 2 + 'px';
     brushCircle.style.top = touch.clientY - brushCircle.offsetHeight / 2 + 'px';
   }
 }, {passive: false});
 
 renderer.domElement.addEventListener('touchend', (event) => {
-  if (event.touches.length === 0) {
-    isDrawing = false;
-  }
-}, {passive: false});
+  if (event.touches.length === 0) isDrawing = false;
+});
 
-// ================= FUNCION HOVER PARA TACTIL =================
 function onTouchHover(touchVec2){
   raycaster.setFromCamera(touchVec2, camera);
   const intersects = raycaster.intersectObjects(glbModel.children, true);
+  hoveredObject = intersects.length>0 ? intersects[0].object : null;
 
   if(intersects.length > 0 && intersects[0].distance <= maxDistance){
     const hitPoint = intersects[0].point;
 
-// ======= HOVER / RESALTADO =======
-glbModel.traverse(child => {
-  if(child.isMesh){
-    let shouldHighlight = false;
-    if(brushSize <= parseFloat(brushSlider.min)){
-      // mínimo: solo el objeto bajo el cursor
-      shouldHighlight = (child === hoveredObject);
-    } else {
-      // brush grande: resalta por distancia a hitPoint
-      const pos = child.geometry.attributes.position;
-      for(let i=0;i<pos.count;i++){
-        const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-        if(vertex.distanceTo(hitPoint) <= brushSize){
-          shouldHighlight = true;
-          break;
-        }
-      }
-    }
-    if(child !== lastClickedObject){
-      child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
-    }
-  }
-});
-
-// ======= PINTADO CONTINUO =======
-if(isDrawing && hoveredObject){
-  if(brushSize <= parseFloat(brushSlider.min)){
-    // mínimo: pinta solo el objeto bajo el cursor continuamente
-    hoveredObject.material.color.set(currentColor);
-    hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
-    if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
-  } else {
-    // brush grande: pinta área
     glbModel.traverse(child => {
       if(child.isMesh){
-        const pos = child.geometry.attributes.position;
-        for(let i=0;i<pos.count;i++){
-          const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
-          if(vertex.distanceTo(hitPoint) <= brushSize){
-            if(!child.userData.currentColor){
-              child.material = child.userData.originalMaterial.clone();
+        let shouldHighlight = false;
+        if(brushSize <= parseFloat(brushSlider.min)){
+          shouldHighlight = (child === hoveredObject);
+        } else {
+          const pos = child.geometry.attributes.position;
+          for(let i=0;i<pos.count;i++){
+            const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+            if(vertex.distanceTo(hitPoint) <= brushSize){
+              shouldHighlight = true;
+              break;
             }
-            child.material.color.set(currentColor);
-            child.userData.currentColor = child.material.color.clone();
-            if(!selectedObjects.includes(child)) selectedObjects.push(child);
-            break;
           }
+        }
+        if(child !== lastClickedObject){
+          child.material.emissive.setHex(shouldHighlight ? 0x333333 : 0x000000);
         }
       }
     });
-  }
-}
+
+    if(isDrawing && hoveredObject){
+      if(brushSize <= parseFloat(brushSlider.min)){
+        hoveredObject.material.color.set(currentColor);
+        hoveredObject.userData.currentColor = hoveredObject.material.color.clone();
+        if(!selectedObjects.includes(hoveredObject)) selectedObjects.push(hoveredObject);
+      } else {
+        glbModel.traverse(child => {
+          if(child.isMesh){
+            const pos = child.geometry.attributes.position;
+            for(let i=0;i<pos.count;i++){
+              const vertex = new THREE.Vector3().fromBufferAttribute(pos,i).applyMatrix4(child.matrixWorld);
+              if(vertex.distanceTo(hitPoint) <= brushSize){
+                if(!child.userData.currentColor){
+                  child.material = child.userData.originalMaterial.clone();
+                }
+                child.material.color.set(currentColor);
+                child.userData.currentColor = child.material.color.clone();
+                if(!selectedObjects.includes(child)) selectedObjects.push(child);
+                break;
+              }
+            }
+          }
+        });
+      }
+    }
 
   } else {
     glbModel.traverse(child => {
@@ -439,6 +413,7 @@ if(isDrawing && hoveredObject){
     });
   }
 }
+
 // ================= ANIMACIÓN ================= 
 function animate(){ 
   requestAnimationFrame(animate); 
@@ -453,12 +428,3 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
-
-
-
-
-
-
-
-
-
