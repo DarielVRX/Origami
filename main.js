@@ -377,14 +377,13 @@ exportImgBtn.addEventListener('click',()=>{
 exportGLBBtn.addEventListener('click', ()=>{
   if(!glbModel) return alert("No hay modelo cargado");
   const exporter = new GLTFExporter();
-  exporter.parse(glbModel, (result)=>{
-    const output = JSON.stringify(result, null, 2);
-    const blob = new Blob([output], {type:'application/json'});
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download='modelo.glb';
-    link.click();
-  }, {binary:true});
+exporter.parse(glbModel, (result)=>{
+  const blob = new Blob([result], {type:'model/gltf-binary'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download='modelo.glb';
+  link.click();
+}, {binary:true});
 });
 
 // ===================== ANIMACIÓN =====================
@@ -401,3 +400,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
