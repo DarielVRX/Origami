@@ -380,31 +380,52 @@ function onMouseDown(event){
   handleHoverAndPaint(intersects);
 }
 
-// ===================== CARGAR ARCHIVO =====================
-loadFileBtn.addEventListener('change',(event)=>{
-  const file = event.target.files[0];
-  if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    loader.parse(e.target.result,'',function(gltf){
-      if(glbModel) scene.remove(glbModel);
-      glbModel = gltf.scene;
-      glbModel.traverse(child=>{
-        if(child.isMesh){
-          if(child.material) child.userData.originalMaterial=child.material.clone();
-        }
-      });
-      scene.add(glbModel);
-      const box = new THREE.Box3().setFromObject(glbModel);
-      const center = box.getCenter(new THREE.Vector3());
-      controls.target.copy(center);
-      controls.update();
-      fileText.textContent = file.name;
-    });
-  };
-  reader.readAsArrayBuffer(file);
-});
+// ===================== CARGA DE GLB REPARADA =====================
+function loadGLB(file){
+  const url = URL.createObjectURL(file);
+  loader.load(url, (gltf)=>{
+    // Remover modelo anterior
+    if(glbModel) scene.remove(glbModel);
 
+    glbModel = gltf.scene;
+    glbModel.scale.set(0.5,0.5,0.5);
+    glbModel.position.set(0,0,0);
+
+    glbModel.traverse(child=>{
+      if(child.isMesh){
+        // Clonar material original
+        if(child.material){
+          child.userData.originalMaterial = child.material.clone();
+          // Si ya tenía color personalizado, reaplicar
+          if(child.userData.currentColor){
+            child.material.color.copy(child.userData.currentColor);
+          } else {
+            child.userData.currentColor = child.material.color.clone();
+          }
+        } else {
+          child.material = baseMaterial.clone();
+          child.userData.originalMaterial = child.material.clone();
+          child.userData.currentColor = child.material.color.clone();
+        }
+        // Calcular boundingSphere para raycasting
+        if(!child.geometry.boundingSphere) child.geometry.computeBoundingSphere();
+      }
+    });
+
+    scene.add(glbModel);
+
+    // Centrar controles en el modelo
+    const box = new THREE.Box3().setFromObject(glbModel);
+    const center = box.getCenter(new THREE.Vector3());
+    controls.target.copy(center);
+    controls.update();
+
+    // Actualizar texto de archivo
+    fileText.textContent = file.name;
+
+    console.log("Modelo cargado correctamente con materiales preservados.");
+  });
+}
 // ===================== EXPORTAR IMAGEN 2x2 =====================
 exportImgBtn.addEventListener('click',()=>{
   if(!glbModel) return alert("No hay modelo cargado");
@@ -489,3 +510,4 @@ window.addEventListener('resize',()=>{
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth,window.innerHeight);
 });
+
