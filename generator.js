@@ -6,6 +6,7 @@
 import * as THREE          from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { GLTFLoader }      from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene }           from './scene.js';
+import { activateExclusive } from './ui.js';
 
 // ── Constantes derivadas del modelo original ──
 const K            = 20 / (360 * 17);  // módulos / (arcDeg * radius)
@@ -21,13 +22,14 @@ let moduleGltf     = null;
 
 const defaultRing = () => ({
   id: Date.now(),
-  fixedA: 'modules',  // dos fijos: 'modules'|'arc'|'scale'
+  fixedA: 'modules',
   fixedB: 'arc',
   modules: 20,
   arc:     360,
-  scale:   1.0,       // escala del módulo (radius = BASE_RADIUS * scale)
+  scale:   1.0,
   layers:  10,
   yOffset: 0,
+  originModule: 1,   // módulo que se alinea con el módulo de referencia (ángulo 0°)
 });
 
 let rings = [defaultRing()];
@@ -86,18 +88,25 @@ export async function generateStructure() {
 
   for (const ring of rings) {
     computeFree(ring);
-    const { modules, arc, scale, layers, yOffset } = ring;
+    const { modules, arc, scale, layers, yOffset, originModule } = ring;
     const angleStep = arc / modules;
     const arcStart  = -(arc / 2);
     const vStep     = V_STEP_BASE * scale;
+    // Offset para que el módulo N quede en ángulo 0° (posición del módulo base)
+    // Capas impares: módulo 1 en 0° → módulo N en (N-1)*angleStep → offset = -(N-1)*angleStep
+    // Capas pares:   módulo 1 en angleStep/2 → offset adicional de -angleStep/2
+    const originOffset = -((originModule - 1) * angleStep);
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
+      // Capas pares tienen el módulo 1 rotado angleStep/2 respecto a impares
       const layerRotOffset = (layer % 2 === 1) ? angleStep / 2 : 0;
+      // Para capas pares, el módulo de origen también está desplazado
+      const evenOddOffset  = (layer % 2 === 1) ? -angleStep / 2 : 0;
       const y = yOffset + layer * vStep;
 
       for (let m = 0; m < modules; m++) {
-        const angleDeg = arcStart + m * angleStep + layerRotOffset;
+        const angleDeg = arcStart + m * angleStep + layerRotOffset + originOffset + evenOddOffset;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
         // Pivot en el origen, rotado. El mesh hijo hereda la rotación.
@@ -370,6 +379,17 @@ export function buildGeneratorPanel() {
         sec.appendChild(hint);
       }
 
+      // Origen del anillo
+      const originRow = document.createElement('div'); originRow.className = 'gen-row';
+      const originLbl = document.createElement('span'); originLbl.className = 'gen-label';
+      originLbl.textContent = 'Módulo origen';
+      const originInp = makeInput(ring.originModule, 1, ring.modules, 1);
+      originInp.addEventListener('change', () => {
+        ring.originModule = Math.max(1, Math.min(ring.modules, parseInt(originInp.value) || 1));
+      });
+      originRow.append(originLbl, originInp);
+      sec.appendChild(originRow);
+
       panel.appendChild(sec);
     });
 
@@ -406,7 +426,7 @@ export function buildGeneratorPanel() {
     e.stopPropagation();
     const isOpen = panel.classList.contains('open');
     if (isOpen) closePanel();
-    else { openPanel(); renderPanel(); }
+    else { openPanel(); renderPanel(); activateExclusive('gen'); }
   });
 
   // Retornar referencias para integración con ui.js
