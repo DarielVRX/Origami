@@ -1,18 +1,31 @@
-// ─────────────────────────────────────────────────────────────
-// main.js — Punto de entrada, conecta todos los módulos
-// ─────────────────────────────────────────────────────────────
-
-import { startLoop, controls }                          from './scene.js';
-import { autoLoadModel, meshColorMap, onModelLoad }     from './model.js';
-import { initExport, setExportRefs }                    from './export.js';
-import { initPaintEvents, onEyedropperPick }            from './paint.js';
-import { buildUI, showToast }                           from './ui.js';
-
+import { startLoop }                                         from './scene.js';
+import { autoLoadModel, meshColorMap, onModelLoad }           from './model.js';
+import { initExport, setExportRefs }                          from './export.js';
+import { initPaintEvents, onEyedropperPick }                  from './paint.js';
+import { buildUI, showToast, setBottomButtonsVisible,
+         onCloseAll }                                         from './ui.js';
+import { buildGeneratorPanel, loadModuleBuffer }              from './generator.js';
 
 // ── Construir UI ──
 const { brushCircle, onColorPicked } = buildUI({});
 
-// ── Inicializar export (las refs de modelo se actualizan en onModelLoad) ──
+// ── Generador — botón superior derecho ──
+const { genBtn, panel: genPanel, closePanel: closeGen } = buildGeneratorPanel();
+
+// Cuando closeAll dispara (clic en escena): cerrar panel generador y restaurar botones
+onCloseAll(() => {
+  closeGen();
+  setBottomButtonsVisible(true);
+});
+
+// Ocultar/mostrar botones inferiores al abrir/cerrar el panel generador
+genBtn.addEventListener('click', () => {
+  requestAnimationFrame(() => {
+    setBottomButtonsVisible(!genPanel.classList.contains('open'));
+  });
+});
+
+// ── Inicializar export ──
 initExport({ glbModel: null, originalGLBBuffer: null, meshColorMap, showToast });
 
 // ── Inicializar eventos de pintura ──
@@ -25,6 +38,11 @@ onEyedropperPick(onColorPicked);
 onModelLoad(() => {
   import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
 });
+
+// ── Cargar módulo base para el generador ──
+loadModuleBuffer('ModeloGLB.glb').catch(() =>
+  console.warn('ModeloGLB.glb no encontrado para generador')
+);
 
 // ── Arrancar ──
 autoLoadModel();
