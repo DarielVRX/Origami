@@ -6,6 +6,8 @@
 import { checkFileExists } from './github.js';
 import { loadGLBFromFile, loadGLBFromGitHub }  from './model.js';
 import { doExportGLB, doExportImage }           from './export.js';
+import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
+import { camera as _cam, controls as _ctrl }   from './scene.js';
 import {
   setCurrentColor, setBrushSize, setEyedropperActive,
   eyedropperActive
@@ -382,18 +384,22 @@ export function closeAll() {
   document.getElementById('brush-panel')?.classList.remove('visible');
   document.getElementById('palette-popup')?.classList.remove('visible');
   document.getElementById('palette-div')?.classList.remove('visible');
+  document.getElementById('cam-joystick')?.classList.remove('visible');
   document.getElementById('fab-main')?.classList.remove('open');
   document.getElementById('fab-children')?.classList.remove('open');
+  const fg = document.getElementById('fab-group');
+  if (fg) fg.style.visibility = 'visible';
+  // Sincronizar fabOpen — se sobreescribe desde buildUI via closure
+  if (typeof _resetFabOpen === 'function') _resetFabOpen();
 }
-
-const fg = document.getElementById('fab-group');
-if (fg) fg.style.visibility = 'visible';
+let _resetFabOpen = null;
+export function registerFabReset(fn) { _resetFabOpen = fn; }
 
 // ─────────────────────────────────────────────────────────────
 // buildUI — construye toda la UI (llamar desde main.js)
 // Retorna { brushCircle, currentColorBtn } para usarlos en otros módulos
 // ─────────────────────────────────────────────────────────────
-export function buildUI({ cameraLockedRef, onCameraLockChange }) {
+export function buildUI({} = {}) {
   // ── Drawer lateral ──
   const sideMenu = document.createElement('div');
   sideMenu.id = 'side-menu';
@@ -438,27 +444,6 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
   fabGroup.id = 'fab-group';
   document.body.appendChild(fabGroup);
 
-  // Candado
-  const fabLock = document.createElement('div');
-  fabLock.id = 'fab-lock'; fabLock.className = 'fab';
-  fabLock.setAttribute('data-tip', 'Bloquear cámara');
-  fabLock.innerHTML = '<span class="lock-icon">🔓</span>';
-  fabGroup.appendChild(fabLock);
-
-  fabLock.addEventListener('click', e => {
-    e.stopPropagation();
-    const locked = onCameraLockChange();
-    const icon   = fabLock.querySelector('.lock-icon');
-    icon.textContent = locked ? '🔒' : '🔓';
-    fabLock.setAttribute('data-tip', locked ? 'Desbloquear cámara' : 'Bloquear cámara');
-    fabLock.classList.toggle('locked',   locked);
-    fabLock.classList.toggle('unlocked', !locked);
-    icon.style.animation = 'none';
-    requestAnimationFrame(() => {
-      icon.style.animation = locked ? 'lockShake 0.4s ease' : 'lockBounce 0.4s ease';
-    });
-  });
-
   // Hijos expandibles
   const fabChildren = document.createElement('div');
   fabChildren.id = 'fab-children';
@@ -476,6 +461,7 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
   const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
   const fabPalette = makeFabChild('', 'Paleta de colores');
   fabPalette.style.cssText += '; background:#ff0000; border:3px solid rgba(255,255,255,0.4);';
+  const fabCam     = makeFabChild('🎮', 'Cámara');
 
   // Botón + principal
   const fabMain = document.createElement('div');
@@ -484,6 +470,7 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
   fabGroup.appendChild(fabMain);
 
   let fabOpen = false;
+  registerFabReset(() => { fabOpen = false; });
   const toggleFab = () => {
     fabOpen = !fabOpen;
     fabMain.classList.toggle('open', fabOpen);
@@ -573,8 +560,10 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
     e.stopPropagation();
     const isOpen = sideMenu.classList.contains('open');
     closeAll();
-    if (!isOpen) sideMenu.classList.add('open');
-    else { fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open'); }
+    if (!isOpen) {
+      sideMenu.classList.add('open');
+      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
+    }
   });
 
   fabBrush.addEventListener('click', e => {
@@ -592,14 +581,118 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
     const isOpen = paletteDiv.classList.contains('visible');
     closeAll();
     if (!isOpen) {
-      fabGroup.style.visibility = 'hidden';
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
+      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
+      fabGroup.style.visibility = 'hidden';
+    }
+  });
+
+  fabCam.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = document.getElementById('cam-joystick')?.classList.contains('visible');
+    closeAll();
+    if (!isOpen) {
+      camJoystick.classList.add('visible');
       fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
     }
   });
 
-  // ── Callback para gotero (desde paint.js) ──
+  // ── Joystick de cámara ──
+  const camJoystick = document.createElement('div');
+  camJoystick.id = 'cam-joystick';
+  document.body.appendChild(camJoystick);
+
+  const MODES = [
+    { id: 'orbit', icon: '🌐', tip: 'Orbitar' },
+    { id: 'pan',   icon: '↔️', tip: 'Pan' },
+    { id: 'zoom',  icon: '↕️', tip: 'Zoom' }
+  ];
+
+  MODES.forEach(({ id, icon, tip }) => {
+    const pad = document.createElement('div');
+    pad.className = 'cam-pad'; pad.dataset.mode = id;
+    pad.setAttribute('data-tip', tip);
+    pad.innerHTML = `<span>${icon}</span>`;
+    camJoystick.appendChild(pad);
+
+    let active = false;
+    let lastX = 0, lastY = 0;
+
+    const start = (x, y) => { active = true; lastX = x; lastY = y; };
+    const move  = (x, y) => {
+      if (!active) return;
+      const dx = x - lastX, dy = y - lastY;
+      lastX = x; lastY = y;
+      const sensitivity = 0.3;
+      if (id === 'orbit') {
+        const spherical = new THREE.Spherical();
+        const target = _ctrl.target.clone();
+        const offset = _cam.position.clone().sub(target);
+        spherical.setFromVector3(offset);
+        spherical.theta -= dx * 0.01 * sensitivity * 10;
+        spherical.phi   += dy * 0.01 * sensitivity * 10;
+        spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi));
+        offset.setFromSpherical(spherical);
+        _cam.position.copy(target).add(offset);
+        _cam.lookAt(target);
+      } else if (id === 'pan') {
+        const panSpeed = 0.05;
+        const right = new THREE.Vector3();
+        right.crossVectors(_cam.getWorldDirection(new THREE.Vector3()), _cam.up).normalize();
+        _cam.position.addScaledVector(right, -dx * panSpeed);
+        _ctrl.target.addScaledVector(right, -dx * panSpeed);
+      } else if (id === 'zoom') {
+        const dir = _cam.position.clone().sub(_ctrl.target).normalize();
+        const dist = _cam.position.distanceTo(_ctrl.target);
+        const newDist = Math.max(5, Math.min(300, dist + dy * 0.5));
+        _cam.position.copy(_ctrl.target).addScaledVector(dir, newDist);
+      }
+      _ctrl.update();
+    };
+    const end = () => { active = false; };
+
+    pad.addEventListener('mousedown',  e => { e.stopPropagation(); start(e.clientX, e.clientY); });
+    window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
+    window.addEventListener('mouseup',   end);
+
+    pad.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: false });
+    window.addEventListener('touchmove', e => { if (active) { e.preventDefault(); const t = e.touches[0]; move(t.clientX, t.clientY); } }, { passive: false });
+    window.addEventListener('touchend', end);
+  });
+
+  // CSS joystick (inyectado aquí para mantenerlo junto al código)
+  document.head.insertAdjacentHTML('beforeend', `<style>
+#cam-joystick {
+  position:fixed; left:24px; bottom:24px; z-index:2000;
+  display:none; flex-direction:row; gap:12px;
+}
+#cam-joystick.visible { display:flex; }
+.cam-pad {
+  width:88px; height:88px; border-radius:50%;
+  background:rgba(20,20,20,0.88); border:1px solid rgba(255,255,255,0.18);
+  backdrop-filter:blur(10px); display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  cursor:pointer; user-select:none; touch-action:none;
+  font-size:28px; color:#fff; position:relative;
+  transition:background 0.15s;
+}
+.cam-pad:hover  { background:rgba(60,60,60,0.95); }
+.cam-pad:active { background:rgba(80,80,200,0.4); border-color:rgba(120,120,255,0.6); }
+.cam-pad[data-tip]::after {
+  content:attr(data-tip);
+  position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%);
+  background:rgba(10,10,10,0.92); color:#eee;
+  font-family:'Courier New',monospace; font-size:12px;
+  padding:4px 10px; border-radius:6px; white-space:nowrap;
+  pointer-events:none; opacity:0; transition:opacity 0.15s;
+  border:1px solid rgba(255,255,255,0.1);
+}
+.cam-pad[data-tip]:hover::after { opacity:1; }
+
+/* Lock animations ya no necesarias pero se conservan por si acaso */
+#fab-lock { display:none; }
+</style>`);
   return {
     brushCircle,
     currentColorBtn: currentColorPreview,  // alias para paint.js
