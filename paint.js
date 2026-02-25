@@ -6,6 +6,7 @@
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { camera, renderer, controls } from './scene.js';
 import { glbModel, meshColorMap }     from './model.js';
+import { closeAll }                   from './ui.js';
 
 // Estado de pintura (leído/escrito desde ui.js también)
 export let currentColor     = '#ff0000';
@@ -120,6 +121,7 @@ export function initPaintEvents(brushCircleEl) {
   });
 
   renderer.domElement.addEventListener('mousedown', e => {
+    closeAll();
     if (e.button !== 0 || !glbModel) return;
     const its = getIntersects(e.clientX, e.clientY);
 
@@ -144,6 +146,7 @@ export function initPaintEvents(brushCircleEl) {
 
   // Touch
   renderer.domElement.addEventListener('touchstart', e => {
+    closeAll();
     if (e.touches.length !== 1 || !glbModel) return;
     touchPainting = true; isDrawing = true;
     const t   = e.touches[0];
