@@ -126,8 +126,8 @@ export async function generateStructure() {
   for (const ring of rings) {
     computeFree(ring);
     const { modules, arc, scale, layers, yOffset, originModule } = ring;
-    const angleStep = arc / modules;
-    const halfStep = angleStep / 2;
+    const angleStep = arc / modules * (-1);
+    const halfStep = angleStep / (-2);
     const originShift = (originModule - 1) * halfStep;
     const vStep = V_STEP_BASE * scale;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
