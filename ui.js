@@ -461,7 +461,6 @@ export function buildUI({} = {}) {
   const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
   const fabPalette = makeFabChild('', 'Paleta de colores');
   fabPalette.style.cssText += '; background:#ff0000; border:3px solid rgba(255,255,255,0.4);';
-  const fabCam     = makeFabChild('🎮', 'Cámara');
 
   // Botón + principal
   const fabMain = document.createElement('div');
@@ -550,7 +549,7 @@ export function buildUI({} = {}) {
       setCurrentColor(color);
       currentColorPreview.style.background = color;
       fabPalette.style.background = color;
-      paletteDiv.classList.remove('visible');
+      closeAll();
     });
     paletteDiv.appendChild(sw);
   });
@@ -588,14 +587,18 @@ export function buildUI({} = {}) {
     }
   });
 
+  // ── Botón joystick independiente (inferior izquierdo, siempre visible) ──
+  const fabCam = document.createElement('div');
+  fabCam.id = 'fab-cam'; fabCam.className = 'fab';
+  fabCam.setAttribute('data-tip', 'Cámara');
+  fabCam.textContent = '🕹️';
+  document.body.appendChild(fabCam);
+
   fabCam.addEventListener('click', e => {
     e.stopPropagation();
     const isOpen = document.getElementById('cam-joystick')?.classList.contains('visible');
     closeAll();
-    if (!isOpen) {
-      camJoystick.classList.add('visible');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
-    }
+    if (!isOpen) camJoystick.classList.add('visible');
   });
 
   // ── Joystick de cámara ──
@@ -664,10 +667,13 @@ export function buildUI({} = {}) {
   // CSS joystick (inyectado aquí para mantenerlo junto al código)
   document.head.insertAdjacentHTML('beforeend', `<style>
 #cam-joystick {
-  position:fixed; left:24px; bottom:24px; z-index:2000;
+  position:fixed; left:24px; bottom:130px; z-index:2000;
   display:none; flex-direction:row; gap:12px;
 }
 #cam-joystick.visible { display:flex; }
+#fab-cam {
+  position:fixed; left:24px; bottom:24px; z-index:2000;
+}
 .cam-pad {
   width:88px; height:88px; border-radius:50%;
   background:rgba(20,20,20,0.88); border:1px solid rgba(255,255,255,0.18);
@@ -703,6 +709,7 @@ export function buildUI({} = {}) {
       document.body.classList.remove('eyedropper-cursor');
       currentColorPreview.style.background = color;
       fabPalette.style.background = color;
+      closeAll();
     }
   };
 }
