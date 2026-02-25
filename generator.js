@@ -105,7 +105,7 @@ export async function generateStructure() {
     // Capas pares:   módulo 1 en angleStep/2 → offset adicional de -angleStep/2
     const originOffset = -((originModule - 1) * angleStep);
     // 2*modules posiciones posibles: cada paso avanza medio ángulo de módulo.
-    const originOffset = -((originModule - 1) * (angleStep / 2));
+    const originShiftDeg = -((originModule - 1) * (angleStep / 2));
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
@@ -118,7 +118,7 @@ export async function generateStructure() {
 
       for (let m = 0; m < modules; m++) {
         const angleDeg = arcStart + m * angleStep + layerRotOffset + originOffset + evenOddOffset;
-        const angleDeg = arcStart + m * angleStep + layerRotOffset + originOffset;
+        const angleDeg = arcStart + m * angleStep + layerRotOffset + originShiftDeg;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
         // Pivot en el origen, rotado. El mesh hijo hereda la rotación.
