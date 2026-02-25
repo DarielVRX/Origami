@@ -17,7 +17,7 @@ export const camera = new THREE.PerspectiveCamera(
   0.1,
   1000
 );
-camera.position.set(0, 22, 80);
+camera.position.set(80, 22, 0);
 
 // ── Renderer ──
 export const renderer = new THREE.WebGLRenderer({
@@ -89,7 +89,7 @@ export function startLoop() {
 
 // ── Posición de cámara estándar frente al módulo base ──
 export function resetCamera() {
-  camera.position.set(0, 22, 80);
+  camera.position.set(80, 22, 0);
   controls.target.set(0, 22, 0);
   controls.update();
 }
