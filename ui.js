@@ -386,6 +386,9 @@ export function closeAll() {
   document.getElementById('fab-children')?.classList.remove('open');
 }
 
+const fg = document.getElementById('fab-group');
+if (fg) fg.style.visibility = 'visible';
+
 // ─────────────────────────────────────────────────────────────
 // buildUI — construye toda la UI (llamar desde main.js)
 // Retorna { brushCircle, currentColorBtn } para usarlos en otros módulos
@@ -589,6 +592,7 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
     const isOpen = paletteDiv.classList.contains('visible');
     closeAll();
     if (!isOpen) {
+      fabGroup.style.visibility = 'hidden';
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
       fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
