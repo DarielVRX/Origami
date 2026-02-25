@@ -57,6 +57,27 @@ scene.add(new THREE.AmbientLight(0x404040));
 scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.2));
 scene.add(new THREE.AxesHelper(5));
 
+// ── Planos guía (ocultos por defecto, toggle vía evento) ──
+const GUIDE_SIZE = 400;
+const guideMat = new THREE.MeshBasicMaterial({
+  color: 0x4488ff, transparent: true, opacity: 0.015,
+  side: THREE.DoubleSide, depthWrite: false
+});
+const planeXY = new THREE.Mesh(new THREE.PlaneGeometry(GUIDE_SIZE, GUIDE_SIZE), guideMat.clone());
+planeXY.visible = false;  // normal Z — guía eje Z
+
+const planeYZ = new THREE.Mesh(new THREE.PlaneGeometry(GUIDE_SIZE, GUIDE_SIZE), guideMat.clone());
+planeYZ.rotation.y = Math.PI / 2;  // normal X — guía eje X
+planeYZ.visible = false;
+
+scene.add(planeXY);
+scene.add(planeYZ);
+
+window.addEventListener('toggleGrid', e => {
+  planeXY.visible = e.detail;
+  planeYZ.visible = e.detail;
+});
+
 // ── Loop de render (exportado para que main.js lo arranque) ──
 export function startLoop() {
   (function animate() {
@@ -64,4 +85,11 @@ export function startLoop() {
     controls.update();
     renderer.render(scene, camera);
   })();
+}
+
+// ── Posición de cámara estándar frente al módulo base ──
+export function resetCamera() {
+  camera.position.set(0, 22, 80);
+  controls.target.set(0, 22, 0);
+  controls.update();
 }
