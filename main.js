@@ -4,7 +4,7 @@ import { autoLoadModel, meshColorMap, onModelLoad,
 import { initExport, setExportRefs }                         from './export.js';
 import { initPaintEvents, onEyedropperPick }                 from './paint.js';
 import { buildUI, showToast, setBottomButtonsVisible,
-         onCloseAll }                                        from './ui.js';
+         onCloseAll, activateExclusive }                             from './ui.js';
 import { buildGeneratorPanel, loadModuleBuffer,
          onGeneratorApply }                                  from './generator.js';
 
@@ -20,10 +20,11 @@ onCloseAll(() => {
   setBottomButtonsVisible(true);
 });
 
-// Ocultar/mostrar botones inferiores al abrir/cerrar el panel generador
+// Ocultar/mostrar botones al abrir/cerrar el panel generador
 genBtn.addEventListener('click', () => {
   requestAnimationFrame(() => {
-    setBottomButtonsVisible(!genPanel.classList.contains('open'));
+    if (genPanel.classList.contains('open')) activateExclusive('gen');
+    else setBottomButtonsVisible(true);
   });
 });
 
