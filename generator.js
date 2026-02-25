@@ -87,10 +87,9 @@ export async function generateStructure() {
   for (const ring of rings) {
     computeFree(ring);
     const { modules, arc, scale, layers, yOffset } = ring;
-    const radius     = BASE_RADIUS * scale;
-    const angleStep  = arc / modules;
-    const arcStart   = -(arc / 2);
-    const vStep      = V_STEP_BASE * scale;
+    const angleStep = arc / modules;
+    const arcStart  = -(arc / 2);
+    const vStep     = V_STEP_BASE * scale;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
@@ -101,16 +100,19 @@ export async function generateStructure() {
         const angleDeg = arcStart + m * angleStep + layerRotOffset;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
+        // Pivot en el origen, rotado. El mesh hijo hereda la rotación.
+        // La geometría del módulo está a x=BASE_RADIUS desde su origen local,
+        // scale la lleva a x = BASE_RADIUS * scale = radio correcto.
+        const pivot = new THREE.Object3D();
+        pivot.rotation.y = -angleRad;
+        pivot.position.y = y;
+
         const mesh = new THREE.Mesh(geometry, mat.clone());
         mesh.scale.setScalar(scale);
-        mesh.rotation.y = -angleRad;
-        // Posición: módulo base está a BASE_RADIUS en +X, escalar al radio deseado
-        mesh.position.set(
-          Math.cos(angleRad) * radius,
-          y,
-          Math.sin(angleRad) * radius
-        );
-        generatedGroup.add(mesh);
+        mesh.userData.pivot = true;
+
+        pivot.add(mesh);
+        generatedGroup.add(pivot);
       }
     }
   }
