@@ -377,7 +377,84 @@ function askGitHubFile() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// closeAll — cierra todos los paneles abiertos
+// ── TEMPORAL: extraer mesh[482] como GLB independiente ── ELIMINAR DESPUÉS
+async function extractBaseModule() {
+  const { originalGLBBuffer } = await import('./model.js');
+  if (!originalGLBBuffer) { showToast('⚠️ Buffer no disponible'); return; }
+
+  const buf  = originalGLBBuffer.slice(0);
+  const view = new DataView(buf);
+  const jLen = view.getUint32(12, true);
+  const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jLen)));
+  const binBase = 20 + jLen + 8;
+
+  const MIDX = 482;
+  const prim = gltf.meshes[MIDX].primitives[0];
+  const usedAcc = [...Object.values(prim.attributes), ...(prim.indices != null ? [prim.indices] : [])];
+  const usedBV  = [...new Set(usedAcc.map(ai => gltf.accessors[ai].bufferView))];
+
+  const newBin = []; let binOff = 0;
+  const bvOffMap = {};
+  for (const bvi of usedBV.sort((a,b)=>a-b)) {
+    const bv = gltf.bufferViews[bvi];
+    const chunk = new Uint8Array(buf, binBase + (bv.byteOffset||0), bv.byteLength);
+    bvOffMap[bvi] = binOff;
+    newBin.push(chunk);
+    binOff += bv.byteLength + ((4 - bv.byteLength % 4) % 4);
+  }
+
+  const bvRemap = {}; const newBVList = [];
+  usedBV.sort((a,b)=>a-b).forEach((old,ni) => {
+    bvRemap[old] = ni;
+    const bv = gltf.bufferViews[old];
+    newBVList.push({ buffer:0, byteOffset:bvOffMap[old], byteLength:bv.byteLength, ...(bv.byteStride?{byteStride:bv.byteStride}:{}) });
+  });
+
+  const accRemap = {}; const newAccList = [];
+  usedAcc.forEach((oldAi, ni) => {
+    accRemap[oldAi] = ni;
+    const a = gltf.accessors[oldAi];
+    newAccList.push({ bufferView:bvRemap[a.bufferView], componentType:a.componentType, count:a.count, type:a.type,
+      ...(a.byteOffset>0?{byteOffset:a.byteOffset}:{}), ...(a.min?{min:a.min}:{}), ...(a.max?{max:a.max}:{}) });
+  });
+
+  const newPrim = { attributes: Object.fromEntries(Object.entries(prim.attributes).map(([k,v])=>[k,accRemap[v]])),
+    ...(prim.indices!=null?{indices:accRemap[prim.indices]}:{}), material:0 };
+
+  const newGltf = { asset:{version:'2.0'}, scene:0, scenes:[{nodes:[0]}], nodes:[{mesh:0,name:'ModuloBase'}],
+    meshes:[{name:'ModuloBase',primitives:[newPrim]}], accessors:newAccList, bufferViews:newBVList,
+    buffers:[{byteLength:binOff}],
+    materials:[{pbrMetallicRoughness:{baseColorFactor:[0.667,0.667,0.667,1.0],metallicFactor:0,roughnessFactor:0.8},doubleSided:true}] };
+
+  const jBytes = new TextEncoder().encode(JSON.stringify(newGltf));
+  const jPad = Math.ceil(jBytes.length/4)*4;
+  const bPad = Math.ceil(binOff/4)*4;
+  const total = 12 + 8 + jPad + 8 + bPad;
+  const out = new ArrayBuffer(total); const ov = new DataView(out); const ob = new Uint8Array(out);
+  let o = 0;
+  ov.setUint32(o,0x46546C67,true);o+=4; ov.setUint32(o,2,true);o+=4; ov.setUint32(o,total,true);o+=4;
+  ov.setUint32(o,jPad,true);o+=4; ov.setUint32(o,0x4E4F534A,true);o+=4;
+  ob.set(jBytes,o); ob.fill(0x20,o+jBytes.length,o+jPad); o+=jPad;
+  ov.setUint32(o,bPad,true);o+=4; ov.setUint32(o,0x004E4942,true);o+=4;
+  let bOff=o; for(const chunk of newBin){ ob.set(chunk,bOff); bOff+=chunk.byteLength+((4-chunk.byteLength%4)%4); }
+
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([out],{type:'model/gltf-binary'}));
+  a.download = 'ModuloBase.glb'; a.click();
+  showToast('✅ ModuloBase.glb descargado');
+}
+// ── FIN TEMPORAL ──
+
+
+// ─────────────────────────────────────────────────────────────
+export function setBottomButtonsVisible(visible) {
+  const v = visible ? 'visible' : 'hidden';
+  const fg = document.getElementById('fab-group');
+  const fc = document.getElementById('fab-cam');
+  if (fg) fg.style.visibility = v;
+  if (fc) fc.style.visibility = v;
+}
+
 // ─────────────────────────────────────────────────────────────
 export function closeAll() {
   document.getElementById('side-menu')?.classList.remove('open');
@@ -389,11 +466,15 @@ export function closeAll() {
   document.getElementById('fab-children')?.classList.remove('open');
   const fg = document.getElementById('fab-group');
   if (fg) fg.style.visibility = 'visible';
-  // Sincronizar fabOpen — se sobreescribe desde buildUI via closure
+  const fc = document.getElementById('fab-cam');
+  if (fc) fc.style.visibility = 'visible';
   if (typeof _resetFabOpen === 'function') _resetFabOpen();
+  _closeAllHooks.forEach(fn => fn());
 }
 let _resetFabOpen = null;
+const _closeAllHooks = [];
 export function registerFabReset(fn) { _resetFabOpen = fn; }
+export function onCloseAll(fn) { _closeAllHooks.push(fn); }
 
 // ─────────────────────────────────────────────────────────────
 // buildUI — construye toda la UI (llamar desde main.js)
@@ -421,6 +502,11 @@ export function buildUI({} = {}) {
 
   addLabel('GitHub');
   addMenuBtn('☁️', 'Cargar desde GitHub',  () => { closeAll(); askGitHubFile(); });
+
+  // ── TEMPORAL: extraer módulo base ── ELIMINAR DESPUÉS
+  addLabel('Utilidades');
+  addMenuBtn('🔩', 'Extraer Módulo Base',  () => { closeAll(); extractBaseModule(); });
+  // ── FIN TEMPORAL ──
 
   addLabel('Archivo');
   const loadInput = document.createElement('input');
