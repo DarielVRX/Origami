@@ -128,7 +128,6 @@ export async function generateStructure() {
     const { modules, arc, scale, layers, yOffset, originModule } = ring;
     const angleStep = arc / modules;
     const halfStep = angleStep / 2;
-    const arcStart = -(arc / 2);
     const originShift = (originModule - 1) * halfStep;
     const vStep = V_STEP_BASE * scale;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
@@ -138,7 +137,7 @@ export async function generateStructure() {
       const y = yOffset + layer * vStep;
 
       for (let m = 0; m < modules; m++) {
-        const angleDeg = arcStart + m * angleStep + layerRotOffset - originShift;
+        const angleDeg = m * angleStep + layerRotOffset - originShift;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
         const pivot = new THREE.Object3D();
