@@ -105,18 +105,18 @@ export async function loadGLBFromGitHub(filename) {
   }
 }
 
-// ── Carga automática al iniciar (ModeloGLB.glb en la raíz) ──
+// ── Carga automática al iniciar — modelo base oculto, solo para buffer ──
 export function autoLoadModel() {
   const url = 'ModeloGLB.glb?v=' + Date.now();
 
   loader.load(
     url,
     gltf => {
-      if (glbModel) scene.remove(glbModel);
+      // Guardar referencia pero NO añadir a escena — el módulo base nunca se muestra
       glbModel = gltf.scene;
       setupModel(glbModel);
+      scene.remove(glbModel);  // setupModel lo añade, lo quitamos inmediatamente
 
-      // Re-fetch del buffer crudo para el export
       fetch(url, { cache: 'no-store' })
         .then(r => r.arrayBuffer())
         .then(buf => {
@@ -130,4 +130,26 @@ export function autoLoadModel() {
     undefined,
     err => console.warn('ModeloGLB.glb no encontrado, carga manual requerida.', err)
   );
+}
+
+// ── Adoptar estructura generada como modelo paintable ──
+export function adoptGeneratedGroup(group) {
+  if (glbModel) scene.remove(glbModel);
+  glbModel = group;
+
+  // Registrar todos los meshes en el mapa de colores
+  meshColorMap.clear();
+  uuidToMesh.clear();
+  group.traverse(child => {
+    if (!child.isMesh) return;
+    child.geometry.computeBoundingSphere();
+    if (!child.geometry.attributes.normal) child.geometry.computeVertexNormals();
+    uuidToMesh.set(child.uuid, child);
+  });
+
+  const center = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3());
+  controls.target.copy(center);
+  controls.update();
+
+  onLoadCallbacks.forEach(cb => cb(group));
 }
