@@ -135,17 +135,13 @@ label.menu-btn  { user-select:none; }
 }
 
 #palette-popup {
-  position:fixed; bottom:130px; right:130px; z-index:1800;
-  display:none; flex-direction:column; align-items:flex-end; gap:10px;
+  position:fixed; bottom:130px; right:24px; z-index:1800;
+  display:none; flex-direction:column; align-items:flex-end; gap:0;
 }
 #palette-popup.visible { display:flex; }
 
-#current-color-preview {
-  width:56px; height:56px; border-radius:12px;
-  border:2px solid rgba(255,255,255,0.35); cursor:pointer;
-  box-shadow:0 2px 12px rgba(0,0,0,0.5); transition:transform 0.15s;
-}
-#current-color-preview:hover { transform:scale(1.08); }
+/* El preview de color ahora ES el FAB de paleta — ver JS */
+#current-color-preview { display:none; }
 
 #palette-div {
   background:rgba(18,18,18,0.97);
@@ -475,7 +471,8 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
   };
   const fabMenu    = makeFabChild('☰',  'Menú');
   const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
-  const fabPalette = makeFabChild('🎨', 'Paleta de colores');
+  const fabPalette = makeFabChild('', 'Paleta de colores');
+  fabPalette.style.cssText += '; background:#ff0000; border:3px solid rgba(255,255,255,0.4);';
 
   // Botón + principal
   const fabMain = document.createElement('div');
@@ -562,6 +559,7 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
     sw.addEventListener('click', () => {
       setCurrentColor(color);
       currentColorPreview.style.background = color;
+      fabPalette.style.background = color;
       paletteDiv.classList.remove('visible');
     });
     paletteDiv.appendChild(sw);
@@ -588,10 +586,11 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
 
   fabPalette.addEventListener('click', e => {
     e.stopPropagation();
-    const isOpen = palettePopup.classList.contains('visible');
+    const isOpen = paletteDiv.classList.contains('visible');
     closeAll();
     if (!isOpen) {
       palettePopup.classList.add('visible');
+      paletteDiv.classList.add('visible');
       fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
     }
   });
@@ -606,6 +605,7 @@ export function buildUI({ cameraLockedRef, onCameraLockChange }) {
       eyedropperBtn.classList.remove('active');
       document.body.classList.remove('eyedropper-cursor');
       currentColorPreview.style.background = color;
+      fabPalette.style.background = color;
     }
   };
 }
