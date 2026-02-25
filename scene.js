@@ -38,16 +38,16 @@ window.addEventListener('resize', () => {
 // ── Controles ──
 export const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = false;
-// Click izquierdo reservado para pintura; rotar con rueda central
-controls.mouseButtons = {
-  LEFT:   THREE.MOUSE.NONE,
-  MIDDLE: THREE.MOUSE.ROTATE,
-  RIGHT:  THREE.MOUSE.NONE
-};
-controls.touches = {
-  ONE: THREE.TOUCH.ROTATE,
-  TWO: THREE.TOUCH.DOLLY_PAN
-};
+controls.enableRotate  = false;
+controls.enableZoom    = false;
+controls.enablePan     = false;
+controls.mouseButtons  = { LEFT: THREE.MOUSE.NONE, MIDDLE: THREE.MOUSE.NONE, RIGHT: THREE.MOUSE.NONE };
+controls.touches       = { ONE: THREE.TOUCH.NONE, TWO: THREE.TOUCH.NONE };
+
+// Bloquear scroll/pinch nativos del navegador
+renderer.domElement.addEventListener('wheel',      e => e.preventDefault(), { passive: false });
+renderer.domElement.addEventListener('touchstart', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+renderer.domElement.addEventListener('touchmove',  e => e.preventDefault(), { passive: false });
 
 // ── Luces ──
 const dirLight = new THREE.DirectionalLight(0xffffff, 1);
