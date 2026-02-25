@@ -44,6 +44,11 @@ function maxModulesAt360(scale) {
   return Math.max(1, Math.round(K * 360 * BASE_RADIUS * scale));
 }
 
+function maxOriginAt360(modules, arc) {
+  const safeArc = Math.max(1, Number(arc) || 360);
+  return Math.max(1, Math.round((modules * 2 / safeArc) * 360));
+}
+
 // ── Cálculo del tercer parámetro ──
 // radius = BASE_RADIUS * scale  →  K * arc * BASE_RADIUS * scale = modules
 function computeFree(ring) {
@@ -68,7 +73,7 @@ function computeFree(ring) {
   ring.layers = Math.max(1, Math.round(clampNumber(ring.layers, 1, 200, 10)));
   ring.yOffset = clampNumber(ring.yOffset, -500, 500, 0);
 
-  const maxOrigin = Math.max(1, ring.modules * 2);
+  const maxOrigin = maxOriginAt360(ring.modules, ring.arc);
   ring.originModule = Math.round(clampNumber(ring.originModule, 1, maxOrigin, 1));
 }
 
@@ -427,7 +432,8 @@ export function buildGeneratorPanel() {
       const originLbl = document.createElement('span');
       originLbl.className = 'gen-label';
       originLbl.textContent = 'Módulo origen';
-      const originInp = makeInput(ring.originModule, 1, ring.modules * 2, 1);
+      const originMax = maxOriginAt360(ring.modules, ring.arc);
+      const originInp = makeInput(ring.originModule, 1, originMax, 1);
       originInp.addEventListener('change', () => {
         const parsed = parseInt(originInp.value, 10);
         if (Number.isFinite(parsed)) ring.originModule = parsed;
@@ -448,7 +454,7 @@ export function buildGeneratorPanel() {
       const newRing = defaultRing();
       newRing.scale = last.scale;
       newRing.yOffset = last.yOffset + last.layers * V_STEP_BASE * last.scale;
-      newRing.originModule = Math.min(newRing.modules * 2, last.originModule);
+      newRing.originModule = Math.min(maxOriginAt360(newRing.modules, newRing.arc), last.originModule);
       rings.push(newRing);
       renderPanel();
     });
