@@ -1,10 +1,12 @@
 import { startLoop }                                         from './scene.js';
-import { autoLoadModel, meshColorMap, onModelLoad }           from './model.js';
-import { initExport, setExportRefs }                          from './export.js';
-import { initPaintEvents, onEyedropperPick }                  from './paint.js';
+import { autoLoadModel, meshColorMap, onModelLoad,
+         adoptGeneratedGroup }                               from './model.js';
+import { initExport, setExportRefs }                         from './export.js';
+import { initPaintEvents, onEyedropperPick }                 from './paint.js';
 import { buildUI, showToast, setBottomButtonsVisible,
-         onCloseAll }                                         from './ui.js';
-import { buildGeneratorPanel, loadModuleBuffer }              from './generator.js';
+         onCloseAll }                                        from './ui.js';
+import { buildGeneratorPanel, loadModuleBuffer,
+         onGeneratorApply }                                  from './generator.js';
 
 // ── Construir UI ──
 const { brushCircle, onColorPicked } = buildUI({});
@@ -37,6 +39,13 @@ onEyedropperPick(onColorPicked);
 // ── Cuando carga un modelo nuevo → actualizar refs en export ──
 onModelLoad(() => {
   import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
+});
+
+// ── Aplicar estructura generada → modo paint ──
+onGeneratorApply(group => {
+  adoptGeneratedGroup(group);
+  import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
+  setBottomButtonsVisible(true);
 });
 
 // ── Cargar módulo base para el generador ──
