@@ -8,17 +8,9 @@ import { initExport, setExportRefs }                    from './export.js';
 import { initPaintEvents, onEyedropperPick }            from './paint.js';
 import { buildUI, showToast }                           from './ui.js';
 
-// ── Estado de cámara ──
-let cameraLocked = false;
 
 // ── Construir UI ──
-const { brushCircle, onColorPicked } = buildUI({
-  onCameraLockChange: () => {
-    cameraLocked = !cameraLocked;
-    controls.enableRotate = !cameraLocked;
-    return cameraLocked;
-  }
-});
+const { brushCircle, onColorPicked } = buildUI({});
 
 // ── Inicializar export (las refs de modelo se actualizan en onModelLoad) ──
 initExport({ glbModel: null, originalGLBBuffer: null, meshColorMap, showToast });
