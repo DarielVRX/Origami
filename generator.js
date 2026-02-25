@@ -3,17 +3,17 @@
 // Dependencias: three, scene.js
 // ─────────────────────────────────────────────────────────────
 
-import * as THREE          from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
-import { GLTFLoader }      from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
-import { scene }           from './scene.js';
+import * as THREE            from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
+import { GLTFLoader }        from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
+import { scene }             from './scene.js';
 import { activateExclusive } from './ui.js';
 
 // ── Constantes derivadas del modelo original ──
-const K            = 20 / (360 * 17);  // módulos / (arcDeg * radius)
-const BASE_RADIUS  = 17;               // radio a scale=1
-const OVERLAP_BASE = 1.4;             // overlap vertical a scale=1
-const V_SPACING_BASE = 3.5;           // spacing vertical a scale=1
-const V_STEP_BASE  = V_SPACING_BASE - OVERLAP_BASE; // 2.1u neto a scale=1
+const K              = 20 / (360 * 17); // módulos / (arcDeg * radius)
+const BASE_RADIUS    = 17;              // radio a scale=1
+const OVERLAP_BASE   = 1.4;             // overlap vertical a scale=1
+const V_SPACING_BASE = 3.5;             // spacing vertical a scale=1
+const V_STEP_BASE    = V_SPACING_BASE - OVERLAP_BASE; // 2.1u neto a scale=1
 
 // ── Estado del generador ──
 let generatedGroup = null;
@@ -22,40 +22,55 @@ let moduleGltf     = null;
 
 const defaultRing = () => ({
   id: Date.now(),
-  fixedA: 'modules',
+  fixedA: 'modules',      // dos fijos: 'modules'|'arc'|'scale'
   fixedB: 'arc',
   modules: 20,
-  arc:     360,
-  scale:   1.0,
-  layers:  10,
+  arc: 360,
+  scale: 1.0,
+  layers: 10,
   yOffset: 0,
-  originModule: 1,   // módulo que se alinea con el módulo de referencia (ángulo 0°)
-  originModule: 1,   // índice de origen en una grilla de 2*modules posiciones angulares
+  originModule: 1,        // índice de origen en grilla angular de 2*modules
 });
 
 let rings = [defaultRing()];
 
+function clampNumber(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, num));
+}
+
+function maxModulesAt360(scale) {
+  return Math.max(1, Math.round(K * 360 * BASE_RADIUS * scale));
+}
+
 // ── Cálculo del tercer parámetro ──
 // radius = BASE_RADIUS * scale  →  K * arc * BASE_RADIUS * scale = modules
 function computeFree(ring) {
-  const { fixedA, fixedB, modules, arc, scale } = ring;
-  const fixed = new Set([fixedA, fixedB]);
+  const fixed = new Set([ring.fixedA, ring.fixedB]);
+
+  ring.arc = clampNumber(ring.arc, 1, 360, 360);
+  ring.scale = clampNumber(ring.scale, 0.01, 20, 1);
+  ring.modules = Math.max(1, Math.round(clampNumber(ring.modules, 1, 10000, 20)));
 
   if (!fixed.has('scale')) {
-    ring.scale = parseFloat((modules / (K * arc * BASE_RADIUS)).toFixed(3));
+    ring.scale = parseFloat((ring.modules / (K * ring.arc * BASE_RADIUS)).toFixed(3));
+    ring.scale = clampNumber(ring.scale, 0.01, 20, 1);
   } else if (!fixed.has('modules')) {
-    ring.modules = Math.max(1, Math.round(K * arc * BASE_RADIUS * scale));
+    ring.modules = Math.max(1, Math.round(K * ring.arc * BASE_RADIUS * ring.scale));
   } else {
-    ring.arc = parseFloat(Math.min(360, Math.max(1,
-      modules / (K * BASE_RADIUS * scale))).toFixed(1));
-    const maxModulesAt360 = Math.max(1, Math.round(K * 360 * BASE_RADIUS * scale));
-    ring.modules = Math.min(Math.max(1, Math.round(modules)), maxModulesAt360);
-    ring.arc = parseFloat(Math.max(1,
-      ring.modules / (K * BASE_RADIUS * scale)).toFixed(1));
+    // Modo fijo módulos + escala: no permitir módulos que obliguen arco > 360
+    ring.modules = Math.min(ring.modules, maxModulesAt360(ring.scale));
+    ring.arc = parseFloat((ring.modules / (K * BASE_RADIUS * ring.scale)).toFixed(1));
+    ring.arc = clampNumber(ring.arc, 1, 360, 360);
   }
 
-  const maxOrigin = Math.max(1, ring.modules * 2);
-  ring.originModule = Math.min(maxOrigin, Math.max(1, Math.round(ring.originModule || 1)));
+  // Ajustes generales finales
+  ring.layers = Math.max(1, Math.round(clampNumber(ring.layers, 1, 200, 10)));
+  ring.yOffset = clampNumber(ring.yOffset, -500, 500, 0);
+
+  const originMax = Math.max(1, ring.modules * 2);
+  ring.originModule = Math.round(clampNumber(ring.originModule, 1, originMax, 1));
 }
 
 // ── Cargar módulo base desde URL ──
@@ -63,7 +78,7 @@ export async function loadModuleBuffer(url) {
   const res = await fetch(url, { cache: 'no-store' });
   if (!res.ok) throw new Error(`No se pudo cargar ${url}`);
   moduleBuffer = await res.arrayBuffer();
-  moduleGltf   = null;   // invalidar caché
+  moduleGltf = null; // invalidar caché
   return moduleBuffer;
 }
 
@@ -77,19 +92,29 @@ async function getModuleGeometry() {
     loader.parse(moduleBuffer.slice(0), '', gltf => {
       const meshes = [];
       gltf.scene.traverse(child => { if (child.isMesh) meshes.push(child); });
-      if (!meshes.length) { reject(new Error('Sin geometría')); return; }
+      if (!meshes.length) {
+        reject(new Error('Sin geometría'));
+        return;
+      }
       moduleGltf = meshes[0].geometry.clone();
       resolve(moduleGltf);
     }, reject);
   });
 }
 
+function disposeGeneratedGroup(group) {
+  if (!group) return;
+  scene.remove(group);
+  group.traverse(child => {
+    if (!child.isMesh) return;
+    child.geometry?.dispose();
+    child.material?.dispose();
+  });
+}
+
 // ── Generar estructura en escena ──
 export async function generateStructure() {
-  if (generatedGroup) {
-    scene.remove(generatedGroup);
-    generatedGroup.traverse(c => { if (c.isMesh) { c.geometry.dispose(); c.material.dispose(); } });
-  }
+  if (generatedGroup) disposeGeneratedGroup(generatedGroup);
   generatedGroup = new THREE.Group();
 
   const geometry = await getModuleGeometry();
@@ -97,33 +122,28 @@ export async function generateStructure() {
   for (const ring of rings) {
     computeFree(ring);
     const { modules, arc, scale, layers, yOffset, originModule } = ring;
+
     const angleStep = arc / modules;
-    const arcStart  = -(arc / 2);
-    const vStep     = V_STEP_BASE * scale;
-    // Offset para que el módulo N quede en ángulo 0° (posición del módulo base)
-    // Capas impares: módulo 1 en 0° → módulo N en (N-1)*angleStep → offset = -(N-1)*angleStep
-    // Capas pares:   módulo 1 en angleStep/2 → offset adicional de -angleStep/2
-    const originOffset = -((originModule - 1) * angleStep);
-    // 2*modules posiciones posibles: cada paso avanza medio ángulo de módulo.
-    const originShiftDeg = -((originModule - 1) * (angleStep / 2));
-    const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
+    const halfStepDeg = angleStep / 2;
+    const arcStart = -(arc / 2);
+    const originShiftDeg = (originModule - 1) * halfStepDeg;
+    const vStep = V_STEP_BASE * scale;
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xaaaaaa,
+      roughness: 0.8,
+      metalness: 0,
+    });
 
     for (let layer = 0; layer < layers; layer++) {
-      // Capas pares tienen el módulo 1 rotado angleStep/2 respecto a impares
       // Mantener traslape alternado original: capas alternas a medio paso.
-      const layerRotOffset = (layer % 2 === 1) ? angleStep / 2 : 0;
-      // Para capas pares, el módulo de origen también está desplazado
-      const evenOddOffset  = (layer % 2 === 1) ? -angleStep / 2 : 0;
+      const layerRotOffset = (layer % 2 === 1) ? halfStepDeg : 0;
       const y = yOffset + layer * vStep;
 
-      for (let m = 0; m < modules; m++) {
-        const angleDeg = arcStart + m * angleStep + layerRotOffset + originOffset + evenOddOffset;
-        const angleDeg = arcStart + m * angleStep + layerRotOffset + originShiftDeg;
+      for (let moduleIndex = 0; moduleIndex < modules; moduleIndex++) {
+        const angleDeg = arcStart + (moduleIndex * angleStep) + layerRotOffset - originShiftDeg;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
-        // Pivot en el origen, rotado. El mesh hijo hereda la rotación.
-        // La geometría del módulo está a x=BASE_RADIUS desde su origen local,
-        // scale la lleva a x = BASE_RADIUS * scale = radio correcto.
         const pivot = new THREE.Object3D();
         pivot.rotation.y = -angleRad;
         pivot.position.y = y;
@@ -144,7 +164,6 @@ export async function generateStructure() {
 
 // ── Construir panel UI del generador ──
 export function buildGeneratorPanel() {
-  // ── CSS ──
   document.head.insertAdjacentHTML('beforeend', `<style>
 #gen-btn {
   position:fixed; top:24px; right:24px; z-index:2000;
@@ -170,18 +189,7 @@ export function buildGeneratorPanel() {
 #gen-panel {
   position:fixed; top:0; right:0; width:360px; height:100vh;
   background:rgba(18,18,18,0.97); backdrop-filter:blur(14px);
-  border-left:1px solid rgba(255,255,255,0.08);
-  z-index:1900; display:flex; flex-direction:column;
-  transform:translateX(100%);
-  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
-  overflow-y:auto;
-}
-#gen-panel.open { transform:translateX(0); }
-
-.gen-section {
-  padding:16px; border-bottom:1px solid rgba(255,255,255,0.06);
-}
-.gen-title {
+@@ -174,53 +204,50 @@ export function buildGeneratorPanel() {
   font-family:'Courier New',monospace; font-size:11px;
   letter-spacing:2px; text-transform:uppercase;
   color:rgba(255,255,255,0.3); margin-bottom:12px;
@@ -207,9 +215,6 @@ export function buildGeneratorPanel() {
 }
 .gen-input[readonly] { cursor:default; }
 
-.fix-toggle {
-  display:flex; gap:4px;
-}
 .fix-btn {
   font-family:'Courier New',monospace; font-size:10px; padding:3px 7px;
   border-radius:4px; border:1px solid rgba(255,255,255,0.15);
@@ -235,11 +240,7 @@ export function buildGeneratorPanel() {
 
 .gen-add-ring {
   margin:12px 16px; padding:12px;
-  background:rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.15);
-  border-radius:8px; color:rgba(255,255,255,0.4);
-  font-family:'Courier New',monospace; font-size:13px; cursor:pointer;
-  text-align:center; transition:all 0.15s; letter-spacing:1px;
-}
+@@ -232,238 +259,291 @@ export function buildGeneratorPanel() {
 .gen-add-ring:hover { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.7); }
 
 .gen-footer {
@@ -265,22 +266,19 @@ export function buildGeneratorPanel() {
 .gen-export:hover { background:rgba(80,200,120,0.25); }
 </style>`);
 
-  // ── Botón superior derecho ──
   const genBtn = document.createElement('div');
-  genBtn.id = 'gen-btn'; genBtn.setAttribute('data-tip', 'Generador');
+  genBtn.id = 'gen-btn';
+  genBtn.setAttribute('data-tip', 'Generador');
   genBtn.textContent = '⚙️';
   document.body.appendChild(genBtn);
 
-  // ── Panel ──
   const panel = document.createElement('div');
   panel.id = 'gen-panel';
   document.body.appendChild(panel);
 
-  // ── Render del panel (se reconstruye al cambiar rings) ──
   function renderPanel() {
     panel.innerHTML = '';
 
-    // Cabecera
     const header = document.createElement('div');
     header.style.cssText = 'padding:40px 16px 8px; display:flex; align-items:center; justify-content:space-between;';
     header.innerHTML = `<span style="font-family:'Courier New',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.5);">Generador</span>`;
@@ -291,54 +289,64 @@ export function buildGeneratorPanel() {
     header.appendChild(closeBtn);
     panel.appendChild(header);
 
-    // Escala global eliminada — cada anillo tiene su propia escala
-
-    // Rings
     rings.forEach((ring, idx) => {
       computeFree(ring);
+
       const sec = document.createElement('div');
       sec.className = 'gen-section';
 
-      // Header del anillo
-      const rh = document.createElement('div'); rh.className = 'ring-header';
+      const rh = document.createElement('div');
+      rh.className = 'ring-header';
       const rtitle = document.createElement('div');
-      rtitle.className = 'gen-title'; rtitle.style.marginBottom = '0';
+      rtitle.className = 'gen-title';
+      rtitle.style.marginBottom = '0';
       rtitle.textContent = `Anillo ${idx + 1}`;
       rh.appendChild(rtitle);
       if (rings.length > 1) {
-        const del = document.createElement('button'); del.className = 'ring-del'; del.textContent = '✕ eliminar';
-        del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); });
+        const del = document.createElement('button');
+        del.className = 'ring-del';
+        del.textContent = '✕ eliminar';
+        del.addEventListener('click', () => {
+          rings.splice(idx, 1);
+          renderPanel();
+        });
         rh.appendChild(del);
       }
       sec.appendChild(rh);
 
-      // Tres parámetros: modules, arc, scale
       const params = [
-        { key: 'modules', label: 'Módulos',  min: 1,    max: 500,  step: 1,   },
-        { key: 'arc',     label: 'Arco (°)', min: 1,    max: 360,  step: 0.5, },
-        { key: 'scale',   label: 'Escala',   min: 0.01, max: 20,   step: 0.01,},
+        { key: 'modules', label: 'Módulos', min: 1, max: 500, step: 1 },
+        { key: 'arc', label: 'Arco (°)', min: 1, max: 360, step: 0.5 },
+        { key: 'scale', label: 'Escala', min: 0.01, max: 20, step: 0.01 },
       ];
 
       params.forEach(({ key, label, min, max, step }) => {
-        const row = document.createElement('div'); row.className = 'gen-row';
-        const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
+        const row = document.createElement('div');
+        row.className = 'gen-row';
+
+        const lbl = document.createElement('span');
+        lbl.className = 'gen-label';
+        lbl.textContent = label;
 
         const isComputed = ring.fixedA !== key && ring.fixedB !== key;
-        const inp = makeInput(
-          key === 'scale' ? parseFloat(ring.scale.toFixed(3)) : ring[key],
-          min, max, step
-        );
-        if (isComputed) { inp.readOnly = true; inp.classList.add('computed'); }
+        const value = key === 'scale' ? parseFloat(ring.scale.toFixed(3)) : ring[key];
+        const inp = makeInput(value, min, max, step);
+
+        if (isComputed) {
+          inp.readOnly = true;
+          inp.classList.add('computed');
+        }
 
         inp.addEventListener('change', () => {
           if (isComputed) return;
-          ring[key] = parseFloat(inp.value) || ring[key];
+          const parsed = parseFloat(inp.value);
+          if (Number.isFinite(parsed)) ring[key] = parsed;
           computeFree(ring);
           renderPanel();
         });
 
         const toggle = document.createElement('button');
-        toggle.className = 'fix-btn' + (isComputed ? '' : ' active');
+        toggle.className = `fix-btn${isComputed ? '' : ' active'}`;
         toggle.textContent = isComputed ? 'auto' : 'fijo';
         toggle.addEventListener('click', () => {
           if (!isComputed) return;
@@ -352,55 +360,69 @@ export function buildGeneratorPanel() {
         sec.appendChild(row);
       });
 
-      // Radio informativo
       const radius = parseFloat((BASE_RADIUS * ring.scale).toFixed(2));
       const radioInfo = document.createElement('div');
-      radioInfo.style.cssText = `font-family:'Courier New',monospace;font-size:11px;
-        color:rgba(80,180,255,0.6);text-align:right;margin:-4px 0 8px;`;
+      radioInfo.style.cssText = "font-family:'Courier New',monospace;font-size:11px;color:rgba(80,180,255,0.6);text-align:right;margin:-4px 0 8px;";
       radioInfo.textContent = `radio calculado: ${radius} u`;
       sec.appendChild(radioInfo);
 
-      // Capas
-      const layerRow = document.createElement('div'); layerRow.className = 'gen-row';
-      const layerLbl = document.createElement('span'); layerLbl.className = 'gen-label'; layerLbl.textContent = 'Capas';
+      const layerRow = document.createElement('div');
+      layerRow.className = 'gen-row';
+      const layerLbl = document.createElement('span');
+      layerLbl.className = 'gen-label';
+      layerLbl.textContent = 'Capas';
       const layerInp = makeInput(ring.layers, 1, 200, 1);
-      layerInp.addEventListener('change', () => { ring.layers = parseInt(layerInp.value) || ring.layers; renderPanel(); });
+      layerInp.addEventListener('change', () => {
+        const parsed = parseInt(layerInp.value, 10);
+        if (Number.isFinite(parsed)) ring.layers = parsed;
+        computeFree(ring);
+        renderPanel();
+      });
       layerRow.append(layerLbl, layerInp);
       sec.appendChild(layerRow);
 
-      // Offset vertical con sugerencia
-      const suggested = idx === 0 ? 0 :
-        (() => {
-          const prev = rings[idx - 1];
-          return parseFloat((prev.yOffset + prev.layers * V_STEP_BASE * prev.scale).toFixed(2));
-        })();
+      const suggested = idx === 0
+        ? 0
+        : parseFloat((rings[idx - 1].yOffset + (rings[idx - 1].layers * V_STEP_BASE * rings[idx - 1].scale)).toFixed(2));
 
-      const offRow = document.createElement('div'); offRow.className = 'gen-row';
-      const offLbl = document.createElement('span'); offLbl.className = 'gen-label'; offLbl.textContent = 'Offset vertical';
+      const offRow = document.createElement('div');
+      offRow.className = 'gen-row';
+      const offLbl = document.createElement('span');
+      offLbl.className = 'gen-label';
+      offLbl.textContent = 'Offset vertical';
       const offInp = makeInput(ring.yOffset, -500, 500, 0.1);
-      offInp.addEventListener('change', () => { ring.yOffset = parseFloat(offInp.value) ?? ring.yOffset; });
+      offInp.addEventListener('change', () => {
+        const parsed = parseFloat(offInp.value);
+        if (Number.isFinite(parsed)) ring.yOffset = parsed;
+        computeFree(ring);
+      });
       offRow.append(offLbl, offInp);
       sec.appendChild(offRow);
 
       if (idx > 0) {
         const hint = document.createElement('div');
-        hint.style.cssText = `font-family:'Courier New',monospace;font-size:11px;
-          color:rgba(255,200,80,0.55);text-align:right;margin:-4px 0 4px;cursor:pointer;`;
+        hint.style.cssText = "font-family:'Courier New',monospace;font-size:11px;color:rgba(255,200,80,0.55);text-align:right;margin:-4px 0 4px;cursor:pointer;";
         hint.textContent = `sugerido: ${suggested} u  ↵`;
         hint.title = 'Clic para aplicar';
-        hint.addEventListener('click', () => { ring.yOffset = suggested; offInp.value = suggested; });
+        hint.addEventListener('click', () => {
+          ring.yOffset = suggested;
+          computeFree(ring);
+          renderPanel();
+        });
         sec.appendChild(hint);
       }
 
-      // Origen del anillo
-      const originRow = document.createElement('div'); originRow.className = 'gen-row';
-      const originLbl = document.createElement('span'); originLbl.className = 'gen-label';
+      const originRow = document.createElement('div');
+      originRow.className = 'gen-row';
+      const originLbl = document.createElement('span');
+      originLbl.className = 'gen-label';
       originLbl.textContent = 'Módulo origen';
-      const originInp = makeInput(ring.originModule, 1, ring.modules, 1);
       const originInp = makeInput(ring.originModule, 1, ring.modules * 2, 1);
       originInp.addEventListener('change', () => {
-        ring.originModule = Math.max(1, Math.min(ring.modules, parseInt(originInp.value) || 1));
-        ring.originModule = Math.max(1, Math.min(ring.modules * 2, parseInt(originInp.value) || 1));
+        const parsed = parseInt(originInp.value, 10);
+        if (Number.isFinite(parsed)) ring.originModule = parsed;
+        computeFree(ring);
+        renderPanel();
       });
       originRow.append(originLbl, originInp);
       sec.appendChild(originRow);
@@ -408,65 +430,92 @@ export function buildGeneratorPanel() {
       panel.appendChild(sec);
     });
 
-    // Botón añadir anillo
     const addRing = document.createElement('div');
-    addRing.className = 'gen-add-ring'; addRing.textContent = '+ Añadir anillo';
+    addRing.className = 'gen-add-ring';
+    addRing.textContent = '+ Añadir anillo';
     addRing.addEventListener('click', () => {
       const last = rings[rings.length - 1];
       const newRing = defaultRing();
-      newRing.scale   = last.scale;
-      newRing.yOffset = last.yOffset + last.layers * V_STEP_BASE * last.scale;
+      newRing.scale = last.scale;
+      newRing.yOffset = last.yOffset + (last.layers * V_STEP_BASE * last.scale);
+      newRing.originModule = Math.min(newRing.modules * 2, last.originModule);
       rings.push(newRing);
       renderPanel();
     });
     panel.appendChild(addRing);
 
-    // Footer
-    const footer = document.createElement('div'); footer.className = 'gen-footer';
-    const prevBtn  = document.createElement('button'); prevBtn.className  = 'gen-action gen-preview'; prevBtn.textContent  = '▶ Preview';
-    const applyBtn = document.createElement('button'); applyBtn.className = 'gen-action gen-apply';   applyBtn.textContent = '✓ Aplicar';
-    const expBtn   = document.createElement('button'); expBtn.className   = 'gen-action gen-export';  expBtn.textContent   = '↓ GLB';
-    prevBtn.addEventListener('click',  () => generateStructure().catch(e => alert('Error: ' + e.message)));
+    const footer = document.createElement('div');
+    footer.className = 'gen-footer';
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'gen-action gen-preview';
+    prevBtn.textContent = '▶ Preview';
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'gen-action gen-apply';
+    applyBtn.textContent = '✓ Aplicar';
+    const expBtn = document.createElement('button');
+    expBtn.className = 'gen-action gen-export';
+    expBtn.textContent = '↓ GLB';
+
+    prevBtn.addEventListener('click', () => generateStructure().catch(e => alert(`Error: ${e.message}`)));
     applyBtn.addEventListener('click', () => applyGenerated(closePanel));
-    expBtn.addEventListener('click',   exportGenerated);
+    expBtn.addEventListener('click', exportGenerated);
+
     footer.append(prevBtn, applyBtn, expBtn);
     panel.appendChild(footer);
   }
 
-  // ── Abrir / cerrar ──
-  function openPanel()  { panel.classList.add('open'); }
-  function closePanel() { panel.classList.remove('open'); if (generatedGroup) { scene.remove(generatedGroup); generatedGroup = null; } }
+  function openPanel() {
+    panel.classList.add('open');
+  }
 
-  genBtn.addEventListener('click', e => {
-    e.stopPropagation();
+  function closePanel() {
+    panel.classList.remove('open');
+    if (generatedGroup) {
+      disposeGeneratedGroup(generatedGroup);
+      generatedGroup = null;
+    }
+  }
+
+  genBtn.addEventListener('click', event => {
+    event.stopPropagation();
     const isOpen = panel.classList.contains('open');
-    if (isOpen) closePanel();
-    else { openPanel(); renderPanel(); activateExclusive('gen'); }
+    if (isOpen) {
+      closePanel();
+      return;
+    }
+    openPanel();
+    renderPanel();
+    activateExclusive('gen');
   });
 
-  // Retornar referencias para integración con ui.js
   return { genBtn, panel, openPanel, closePanel };
 }
 
 // ── Callback registrado desde main.js para "Aplicar" ──
 let _onApply = null;
-export function onGeneratorApply(fn) { _onApply = fn; }
+export function onGeneratorApply(fn) {
+  _onApply = fn;
+}
 
 // ── Aplicar: fijar estructura como modelo paintable ──
 function applyGenerated(closePanel) {
   if (!generatedGroup || generatedGroup.children.length === 0) {
-    alert('Genera una vista previa primero.'); return;
+    alert('Genera una vista previa primero.');
+    return;
   }
+
   if (_onApply) _onApply(generatedGroup);
-  generatedGroup = null;  // ya no lo gestiona el generador
+  generatedGroup = null; // ya no lo gestiona el generador
   closePanel();
 }
 
 // ── Exportar estructura generada como GLB ──
 async function exportGenerated() {
   if (!generatedGroup || generatedGroup.children.length === 0) {
-    alert('Genera una vista previa primero.'); return;
+    alert('Genera una vista previa primero.');
+    return;
   }
+
   // Serializar usando el mismo pipeline de buildPatchedGLB adaptado para instancias
   // Por ahora: descarga placeholder — se completará en siguiente iteración
   alert('Export de estructura generada — próximamente.');
@@ -475,8 +524,11 @@ async function exportGenerated() {
 // ── Helper: input numérico ──
 function makeInput(value, min, max, step) {
   const el = document.createElement('input');
-  el.type  = 'number'; el.className = 'gen-input';
-  el.min   = min; el.max = max; el.step = step;
+  el.type = 'number';
+  el.className = 'gen-input';
+  el.min = min;
+  el.max = max;
+  el.step = step;
   el.value = value;
   return el;
 }
