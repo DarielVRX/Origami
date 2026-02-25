@@ -17,27 +17,27 @@ const V_STEP_BASE    = V_SPACING_BASE - OVERLAP_BASE; // 2.1u neto a scale=1
 
 // ── Estado del generador ──
 let generatedGroup = null;
-let moduleBuffer   = null;
-let moduleGltf     = null;
+let moduleBuffer = null;
+let moduleGltf = null;
 
 const defaultRing = () => ({
   id: Date.now(),
-  fixedA: 'modules',      // dos fijos: 'modules'|'arc'|'scale'
+  fixedA: 'modules', // dos fijos: 'modules'|'arc'|'scale'
   fixedB: 'arc',
   modules: 20,
   arc: 360,
   scale: 1.0,
   layers: 10,
   yOffset: 0,
-  originModule: 1,        // índice de origen en grilla angular de 2*modules
+  originModule: 1, // índice de origen en grilla angular de 2*modules
 });
 
 let rings = [defaultRing()];
 
 function clampNumber(value, min, max, fallback) {
-  const num = Number(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(max, Math.max(min, num));
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
 }
 
 function maxModulesAt360(scale) {
@@ -59,18 +59,27 @@ function computeFree(ring) {
   } else if (!fixed.has('modules')) {
     ring.modules = Math.max(1, Math.round(K * ring.arc * BASE_RADIUS * ring.scale));
   } else {
-    // Modo fijo módulos + escala: no permitir módulos que obliguen arco > 360
+    // En modo módulos+escala, impedir combinaciones que impliquen arco > 360
     ring.modules = Math.min(ring.modules, maxModulesAt360(ring.scale));
     ring.arc = parseFloat((ring.modules / (K * BASE_RADIUS * ring.scale)).toFixed(1));
     ring.arc = clampNumber(ring.arc, 1, 360, 360);
   }
 
-  // Ajustes generales finales
   ring.layers = Math.max(1, Math.round(clampNumber(ring.layers, 1, 200, 10)));
   ring.yOffset = clampNumber(ring.yOffset, -500, 500, 0);
 
-  const originMax = Math.max(1, ring.modules * 2);
-  ring.originModule = Math.round(clampNumber(ring.originModule, 1, originMax, 1));
+  const maxOrigin = Math.max(1, ring.modules * 2);
+  ring.originModule = Math.round(clampNumber(ring.originModule, 1, maxOrigin, 1));
+}
+
+function disposeGeneratedGroup(group) {
+  if (!group) return;
+  scene.remove(group);
+  group.traverse(child => {
+    if (!child.isMesh) return;
+    child.geometry?.dispose();
+    child.material?.dispose();
+  });
 }
 
 // ── Cargar módulo base desde URL ──
@@ -102,16 +111,6 @@ async function getModuleGeometry() {
   });
 }
 
-function disposeGeneratedGroup(group) {
-  if (!group) return;
-  scene.remove(group);
-  group.traverse(child => {
-    if (!child.isMesh) return;
-    child.geometry?.dispose();
-    child.material?.dispose();
-  });
-}
-
 // ── Generar estructura en escena ──
 export async function generateStructure() {
   if (generatedGroup) disposeGeneratedGroup(generatedGroup);
@@ -122,26 +121,19 @@ export async function generateStructure() {
   for (const ring of rings) {
     computeFree(ring);
     const { modules, arc, scale, layers, yOffset, originModule } = ring;
-
     const angleStep = arc / modules;
-    const halfStepDeg = angleStep / 2;
+    const halfStep = angleStep / 2;
     const arcStart = -(arc / 2);
-    const originShiftDeg = (originModule - 1) * halfStepDeg;
+    const originShift = (originModule - 1) * halfStep;
     const vStep = V_STEP_BASE * scale;
-
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xaaaaaa,
-      roughness: 0.8,
-      metalness: 0,
-    });
+    const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
-      // Mantener traslape alternado original: capas alternas a medio paso.
-      const layerRotOffset = (layer % 2 === 1) ? halfStepDeg : 0;
+      const layerRotOffset = (layer % 2 === 1) ? halfStep : 0;
       const y = yOffset + layer * vStep;
 
-      for (let moduleIndex = 0; moduleIndex < modules; moduleIndex++) {
-        const angleDeg = arcStart + (moduleIndex * angleStep) + layerRotOffset - originShiftDeg;
+      for (let m = 0; m < modules; m++) {
+        const angleDeg = arcStart + m * angleStep + layerRotOffset - originShift;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
         const pivot = new THREE.Object3D();
@@ -164,107 +156,126 @@ export async function generateStructure() {
 
 // ── Construir panel UI del generador ──
 export function buildGeneratorPanel() {
+  // ── CSS (restaurado al estilo original) ──
   document.head.insertAdjacentHTML('beforeend', `<style>
-#gen-btn {
-  position:fixed; top:24px; right:24px; z-index:2000;
-  width:72px; height:72px; border-radius:50%;
-  background:rgba(20,20,20,0.88); border:1px solid rgba(255,255,255,0.18);
-  backdrop-filter:blur(10px); display:flex; align-items:center;
-  justify-content:center; cursor:pointer; font-size:28px; color:#fff;
-  transition:background 0.2s, transform 0.2s; user-select:none;
-}
-#gen-btn:hover  { background:rgba(50,50,50,0.95); transform:scale(1.07); }
-#gen-btn:active { transform:scale(0.95); }
-#gen-btn[data-tip]::after {
-  content:attr(data-tip);
-  position:absolute; top:calc(100% + 8px); right:0;
-  background:rgba(10,10,10,0.92); color:#eee;
-  font-family:'Courier New',monospace; font-size:12px;
-  padding:4px 10px; border-radius:6px; white-space:nowrap;
-  pointer-events:none; opacity:0; transition:opacity 0.15s;
-  border:1px solid rgba(255,255,255,0.1);
-}
-#gen-btn:hover::after { opacity:1; }
+    #gen-btn {
+    position:fixed; top:24px; right:24px; z-index:2000;
+    width:72px; height:72px; border-radius:50%;
+    background:rgba(20,20,20,0.88); border:1px solid rgba(255,255,255,0.18);
+    backdrop-filter:blur(10px); display:flex; align-items:center;
+    justify-content:center; cursor:pointer; font-size:28px; color:#fff;
+    transition:background 0.2s, transform 0.2s; user-select:none;
+    }
+    #gen-btn:hover  { background:rgba(50,50,50,0.95); transform:scale(1.07); }
+    #gen-btn:active { transform:scale(0.95); }
+    #gen-btn[data-tip]::after {
+    content:attr(data-tip);
+    position:absolute; top:calc(100% + 8px); right:0;
+    background:rgba(10,10,10,0.92); color:#eee;
+    font-family:'Courier New',monospace; font-size:12px;
+    padding:4px 10px; border-radius:6px; white-space:nowrap;
+    pointer-events:none; opacity:0; transition:opacity 0.15s;
+    border:1px solid rgba(255,255,255,0.1);
+    }
+    #gen-btn:hover::after { opacity:1; }
 
-#gen-panel {
-  position:fixed; top:0; right:0; width:360px; height:100vh;
-  background:rgba(18,18,18,0.97); backdrop-filter:blur(14px);
-@@ -174,53 +204,50 @@ export function buildGeneratorPanel() {
-  font-family:'Courier New',monospace; font-size:11px;
-  letter-spacing:2px; text-transform:uppercase;
-  color:rgba(255,255,255,0.3); margin-bottom:12px;
-}
-.gen-row {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:10px; gap:8px;
-}
-.gen-label {
-  font-family:'Courier New',monospace; font-size:12px;
-  color:rgba(255,255,255,0.55); white-space:nowrap; flex-shrink:0;
-}
-.gen-input {
-  background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15);
-  border-radius:6px; color:#fff; font-family:'Courier New',monospace;
-  font-size:13px; padding:6px 10px; width:90px; text-align:right;
-  outline:none; transition:border-color 0.2s;
-}
-.gen-input:focus { border-color:rgba(255,255,255,0.4); }
-.gen-input.computed {
-  border-color:rgba(80,180,255,0.4); color:rgba(80,200,255,0.9);
-  background:rgba(80,180,255,0.06);
-}
-.gen-input[readonly] { cursor:default; }
+    #gen-panel {
+    position:fixed; top:0; right:0; width:360px; height:100vh;
+    background:rgba(18,18,18,0.97); backdrop-filter:blur(14px);
+    border-left:1px solid rgba(255,255,255,0.08);
+    z-index:1900; display:flex; flex-direction:column;
+    transform:translateX(100%);
+    transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    overflow-y:auto;
+    }
+    #gen-panel.open { transform:translateX(0); }
 
-.fix-btn {
-  font-family:'Courier New',monospace; font-size:10px; padding:3px 7px;
-  border-radius:4px; border:1px solid rgba(255,255,255,0.15);
-  background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.4);
-  cursor:pointer; transition:all 0.15s; letter-spacing:1px;
-  text-transform:uppercase;
-}
-.fix-btn.active {
-  background:rgba(255,160,60,0.25); border-color:rgba(255,160,60,0.6);
-  color:#ffb347;
-}
+    .gen-section {
+      padding:16px; border-bottom:1px solid rgba(255,255,255,0.06);
+    }
+    .gen-title {
+      font-family:'Courier New',monospace; font-size:11px;
+      letter-spacing:2px; text-transform:uppercase;
+      color:rgba(255,255,255,0.3); margin-bottom:12px;
+    }
+    .gen-row {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:10px; gap:8px;
+    }
+    .gen-label {
+      font-family:'Courier New',monospace; font-size:12px;
+      color:rgba(255,255,255,0.55); white-space:nowrap; flex-shrink:0;
+    }
+    .gen-input {
+      background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15);
+      border-radius:6px; color:#fff; font-family:'Courier New',monospace;
+      font-size:13px; padding:6px 10px; width:90px; text-align:right;
+      outline:none; transition:border-color 0.2s;
+    }
+    .gen-input:focus { border-color:rgba(255,255,255,0.4); }
+    .gen-input.computed {
+      border-color:rgba(80,180,255,0.4); color:rgba(80,200,255,0.9);
+      background:rgba(80,180,255,0.06);
+    }
+    .gen-input[readonly] { cursor:default; }
 
-.ring-header {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:12px;
-}
-.ring-del {
-  background:rgba(255,80,80,0.12); border:1px solid rgba(255,80,80,0.3);
-  border-radius:6px; color:#ff6b6b; font-size:12px; padding:4px 10px;
-  cursor:pointer; font-family:'Courier New',monospace; transition:background 0.15s;
-}
-.ring-del:hover { background:rgba(255,80,80,0.25); }
+    .fix-toggle {
+      display:flex; gap:4px;
+    }
+    .fix-btn {
+      font-family:'Courier New',monospace; font-size:10px; padding:3px 7px;
+      border-radius:4px; border:1px solid rgba(255,255,255,0.15);
+      background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.4);
+      cursor:pointer; transition:all 0.15s; letter-spacing:1px;
+      text-transform:uppercase;
+    }
+    .fix-btn.active {
+      background:rgba(255,160,60,0.25); border-color:rgba(255,160,60,0.6);
+      color:#ffb347;
+    }
 
-.gen-add-ring {
-  margin:12px 16px; padding:12px;
-@@ -232,238 +259,291 @@ export function buildGeneratorPanel() {
-.gen-add-ring:hover { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.7); }
+    .ring-header {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:12px;
+    }
+    .ring-del {
+      background:rgba(255,80,80,0.12); border:1px solid rgba(255,80,80,0.3);
+      border-radius:6px; color:#ff6b6b; font-size:12px; padding:4px 10px;
+      cursor:pointer; font-family:'Courier New',monospace; transition:background 0.15s;
+    }
+    .ring-del:hover { background:rgba(255,80,80,0.25); }
 
-.gen-footer {
-  padding:16px; display:flex; gap:10px; margin-top:auto;
-  border-top:1px solid rgba(255,255,255,0.06);
-}
-.gen-action {
-  flex:1; padding:12px; border-radius:8px; cursor:pointer;
-  font-family:'Courier New',monospace; font-size:13px; letter-spacing:1px;
-  text-transform:uppercase; border:1px solid; transition:background 0.15s;
-}
-.gen-preview {
-  background:rgba(80,180,255,0.12); border-color:rgba(80,180,255,0.4); color:#6ab0ff;
-}
-.gen-preview:hover { background:rgba(80,180,255,0.25); }
-.gen-apply {
-  background:rgba(200,120,255,0.12); border-color:rgba(200,120,255,0.4); color:#c97fff;
-}
-.gen-apply:hover { background:rgba(200,120,255,0.25); }
-.gen-export {
-  background:rgba(80,200,120,0.12); border-color:rgba(80,200,120,0.4); color:#6fdc9a;
-}
-.gen-export:hover { background:rgba(80,200,120,0.25); }
-</style>`);
+    .gen-add-ring {
+      margin:12px 16px; padding:12px;
+      background:rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.15);
+      border-radius:8px; color:rgba(255,255,255,0.4);
+      font-family:'Courier New',monospace; font-size:13px; cursor:pointer;
+      text-align:center; transition:all 0.15s; letter-spacing:1px;
+    }
+    .gen-add-ring:hover { background:rgba(255,255,255,0.08); color:rgba(255,255,255,0.7); }
+
+    .gen-footer {
+      padding:16px; display:flex; gap:10px; margin-top:auto;
+      border-top:1px solid rgba(255,255,255,0.06);
+    }
+    .gen-action {
+      flex:1; padding:12px; border-radius:8px; cursor:pointer;
+      font-family:'Courier New',monospace; font-size:13px; letter-spacing:1px;
+      text-transform:uppercase; border:1px solid; transition:background 0.15s;
+    }
+    .gen-preview {
+      background:rgba(80,180,255,0.12); border-color:rgba(80,180,255,0.4); color:#6ab0ff;
+    }
+    .gen-preview:hover { background:rgba(80,180,255,0.25); }
+    .gen-apply {
+      background:rgba(200,120,255,0.12); border-color:rgba(200,120,255,0.4); color:#c97fff;
+    }
+    .gen-apply:hover { background:rgba(200,120,255,0.25); }
+    .gen-export {
+      background:rgba(80,200,120,0.12); border-color:rgba(80,200,120,0.4); color:#6fdc9a;
+    }
+    .gen-export:hover { background:rgba(80,200,120,0.25); }
+    </style>`);
 
   const genBtn = document.createElement('div');
   genBtn.id = 'gen-btn';
@@ -291,7 +302,6 @@ export function buildGeneratorPanel() {
 
     rings.forEach((ring, idx) => {
       computeFree(ring);
-
       const sec = document.createElement('div');
       sec.className = 'gen-section';
 
@@ -323,15 +333,12 @@ export function buildGeneratorPanel() {
       params.forEach(({ key, label, min, max, step }) => {
         const row = document.createElement('div');
         row.className = 'gen-row';
-
         const lbl = document.createElement('span');
         lbl.className = 'gen-label';
         lbl.textContent = label;
 
         const isComputed = ring.fixedA !== key && ring.fixedB !== key;
-        const value = key === 'scale' ? parseFloat(ring.scale.toFixed(3)) : ring[key];
-        const inp = makeInput(value, min, max, step);
-
+        const inp = makeInput(key === 'scale' ? parseFloat(ring.scale.toFixed(3)) : ring[key], min, max, step);
         if (isComputed) {
           inp.readOnly = true;
           inp.classList.add('computed');
@@ -362,7 +369,8 @@ export function buildGeneratorPanel() {
 
       const radius = parseFloat((BASE_RADIUS * ring.scale).toFixed(2));
       const radioInfo = document.createElement('div');
-      radioInfo.style.cssText = "font-family:'Courier New',monospace;font-size:11px;color:rgba(80,180,255,0.6);text-align:right;margin:-4px 0 8px;";
+      radioInfo.style.cssText = `font-family:'Courier New',monospace;font-size:11px;
+      color:rgba(80,180,255,0.6);text-align:right;margin:-4px 0 8px;`;
       radioInfo.textContent = `radio calculado: ${radius} u`;
       sec.appendChild(radioInfo);
 
@@ -381,9 +389,10 @@ export function buildGeneratorPanel() {
       layerRow.append(layerLbl, layerInp);
       sec.appendChild(layerRow);
 
-      const suggested = idx === 0
-        ? 0
-        : parseFloat((rings[idx - 1].yOffset + (rings[idx - 1].layers * V_STEP_BASE * rings[idx - 1].scale)).toFixed(2));
+      const suggested = idx === 0 ? 0 : (() => {
+        const prev = rings[idx - 1];
+        return parseFloat((prev.yOffset + prev.layers * V_STEP_BASE * prev.scale).toFixed(2));
+      })();
 
       const offRow = document.createElement('div');
       offRow.className = 'gen-row';
@@ -401,7 +410,8 @@ export function buildGeneratorPanel() {
 
       if (idx > 0) {
         const hint = document.createElement('div');
-        hint.style.cssText = "font-family:'Courier New',monospace;font-size:11px;color:rgba(255,200,80,0.55);text-align:right;margin:-4px 0 4px;cursor:pointer;";
+        hint.style.cssText = `font-family:'Courier New',monospace;font-size:11px;
+        color:rgba(255,200,80,0.55);text-align:right;margin:-4px 0 4px;cursor:pointer;`;
         hint.textContent = `sugerido: ${suggested} u  ↵`;
         hint.title = 'Clic para aplicar';
         hint.addEventListener('click', () => {
@@ -437,7 +447,7 @@ export function buildGeneratorPanel() {
       const last = rings[rings.length - 1];
       const newRing = defaultRing();
       newRing.scale = last.scale;
-      newRing.yOffset = last.yOffset + (last.layers * V_STEP_BASE * last.scale);
+      newRing.yOffset = last.yOffset + last.layers * V_STEP_BASE * last.scale;
       newRing.originModule = Math.min(newRing.modules * 2, last.originModule);
       rings.push(newRing);
       renderPanel();
@@ -455,11 +465,9 @@ export function buildGeneratorPanel() {
     const expBtn = document.createElement('button');
     expBtn.className = 'gen-action gen-export';
     expBtn.textContent = '↓ GLB';
-
     prevBtn.addEventListener('click', () => generateStructure().catch(e => alert(`Error: ${e.message}`)));
     applyBtn.addEventListener('click', () => applyGenerated(closePanel));
     expBtn.addEventListener('click', exportGenerated);
-
     footer.append(prevBtn, applyBtn, expBtn);
     panel.appendChild(footer);
   }
@@ -476,16 +484,15 @@ export function buildGeneratorPanel() {
     }
   }
 
-  genBtn.addEventListener('click', event => {
-    event.stopPropagation();
+  genBtn.addEventListener('click', e => {
+    e.stopPropagation();
     const isOpen = panel.classList.contains('open');
-    if (isOpen) {
-      closePanel();
-      return;
+    if (isOpen) closePanel();
+    else {
+      openPanel();
+      renderPanel();
+      activateExclusive('gen');
     }
-    openPanel();
-    renderPanel();
-    activateExclusive('gen');
   });
 
   return { genBtn, panel, openPanel, closePanel };
@@ -493,9 +500,7 @@ export function buildGeneratorPanel() {
 
 // ── Callback registrado desde main.js para "Aplicar" ──
 let _onApply = null;
-export function onGeneratorApply(fn) {
-  _onApply = fn;
-}
+export function onGeneratorApply(fn) { _onApply = fn; }
 
 // ── Aplicar: fijar estructura como modelo paintable ──
 function applyGenerated(closePanel) {
@@ -503,7 +508,6 @@ function applyGenerated(closePanel) {
     alert('Genera una vista previa primero.');
     return;
   }
-
   if (_onApply) _onApply(generatedGroup);
   generatedGroup = null; // ya no lo gestiona el generador
   closePanel();
@@ -515,7 +519,6 @@ async function exportGenerated() {
     alert('Genera una vista previa primero.');
     return;
   }
-
   // Serializar usando el mismo pipeline de buildPatchedGLB adaptado para instancias
   // Por ahora: descarga placeholder — se completará en siguiente iteración
   alert('Export de estructura generada — próximamente.');
