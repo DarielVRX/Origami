@@ -6,6 +6,7 @@
 import * as THREE      from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { GLTFLoader }  from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene, camera, controls } from './scene.js';
+import { resetCamera }            from './scene.js';
 import { downloadFromGitHub }      from './github.js';
 
 export let glbModel        = null;
@@ -83,6 +84,7 @@ export function loadGLBFromBuffer(buffer) {
     if (glbModel) scene.remove(glbModel);
     glbModel = gltf.scene;
     setupModel(glbModel);
+    resetCamera();
     console.log(`GLB cargado: ${buffer.byteLength.toLocaleString()} bytes`);
   }, err => console.error('Error parseando GLB:', err));
 
@@ -150,6 +152,6 @@ export function adoptGeneratedGroup(group) {
   const center = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3());
   controls.target.copy(center);
   controls.update();
-
+  resetCamera();
   onLoadCallbacks.forEach(cb => cb(group));
 }
