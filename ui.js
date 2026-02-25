@@ -451,8 +451,25 @@ export function setBottomButtonsVisible(visible) {
   const v = visible ? 'visible' : 'hidden';
   const fg = document.getElementById('fab-group');
   const fc = document.getElementById('fab-cam');
+  const gb = document.getElementById('gen-btn');
   if (fg) fg.style.visibility = v;
   if (fc) fc.style.visibility = v;
+  if (gb) gb.style.visibility = v;
+}
+
+// Ocultar solo los otros dos botones al activar uno
+// name: 'fab' | 'joystick' | 'gen'
+export function activateExclusive(name) {
+  const fg = document.getElementById('fab-group');
+  const fc = document.getElementById('fab-cam');
+  const gb = document.getElementById('gen-btn');
+  const jk = document.getElementById('cam-joystick');
+  // Contraer joystick si no es el activo
+  if (name !== 'joystick' && jk) jk.classList.remove('visible');
+  // Visibilidad de cada botón
+  if (fg) fg.style.visibility = (name === 'fab'      ? 'visible' : 'hidden');
+  if (fc) fc.style.visibility = (name === 'joystick' ? 'visible' : 'hidden');
+  if (gb) gb.style.visibility = (name === 'gen'      ? 'visible' : 'hidden');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -468,6 +485,8 @@ export function closeAll() {
   if (fg) fg.style.visibility = 'visible';
   const fc = document.getElementById('fab-cam');
   if (fc) fc.style.visibility = 'visible';
+  const gb = document.getElementById('gen-btn');
+  if (gb) gb.style.visibility = 'visible';
   if (typeof _resetFabOpen === 'function') _resetFabOpen();
   _closeAllHooks.forEach(fn => fn());
 }
@@ -669,7 +688,7 @@ export function buildUI({} = {}) {
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
       fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
-      fabGroup.style.visibility = 'hidden';
+      activateExclusive('fab');
     }
   });
 
@@ -684,7 +703,10 @@ export function buildUI({} = {}) {
     e.stopPropagation();
     const isOpen = document.getElementById('cam-joystick')?.classList.contains('visible');
     closeAll();
-    if (!isOpen) camJoystick.classList.add('visible');
+    if (!isOpen) {
+      camJoystick.classList.add('visible');
+      activateExclusive('joystick');
+    }
   });
 
   // ── Joystick de cámara ──
@@ -784,7 +806,33 @@ export function buildUI({} = {}) {
 
 /* Lock animations ya no necesarias pero se conservan por si acaso */
 #fab-lock { display:none; }
+
+#grid-btn {
+  position:fixed; top:24px; left:24px; z-index:2000;
+  width:56px; height:56px; border-radius:12px;
+  background:rgba(20,20,20,0.75); border:1px solid rgba(255,255,255,0.15);
+  backdrop-filter:blur(8px); display:flex; align-items:center;
+  justify-content:center; cursor:pointer; font-size:20px; color:rgba(255,255,255,0.4);
+  transition:all 0.2s; user-select:none;
+}
+#grid-btn:hover  { background:rgba(50,50,50,0.9); color:rgba(255,255,255,0.7); }
+#grid-btn.active { background:rgba(80,180,255,0.18); border-color:rgba(80,180,255,0.5); color:#6ab0ff; }
 </style>`);
+
+  // ── Botón de malla guía (superior izquierdo) ──
+  const gridBtn = document.createElement('div');
+  gridBtn.id = 'grid-btn'; gridBtn.title = 'Malla guía';
+  gridBtn.textContent = '⊹';
+  document.body.appendChild(gridBtn);
+
+  let gridVisible = false;
+  gridBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    gridVisible = !gridVisible;
+    gridBtn.classList.toggle('active', gridVisible);
+    // Notificar a scene via custom event
+    window.dispatchEvent(new CustomEvent('toggleGrid', { detail: gridVisible }));
+  });
   return {
     brushCircle,
     currentColorBtn: currentColorPreview,  // alias para paint.js
