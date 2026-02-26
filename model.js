@@ -13,12 +13,29 @@ export let glbModel        = null;
 export let originalGLBBuffer = null;
 export const meshColorMap  = new Map(); // uuid → '#rrggbb'
 export const uuidToMesh    = new Map(); // uuid → THREE.Mesh
+export let generatorRingsFromFile = null;
 
 // Callbacks que otros módulos suscriben para reaccionar a carga/descarga
 const onLoadCallbacks = [];
 export function onModelLoad(cb) { onLoadCallbacks.push(cb); }
 
 const loader = new GLTFLoader();
+
+
+function readGeneratorMetadata(buffer) {
+  try {
+    const view = new DataView(buffer);
+    if (view.getUint32(0, true) !== 0x46546C67) return null;
+    const jsonChunkLen = view.getUint32(12, true);
+    const jsonChunkType = view.getUint32(16, true);
+    if (jsonChunkType !== 0x4E4F534A) return null;
+    const json = JSON.parse(new TextDecoder().decode(new Uint8Array(buffer, 20, jsonChunkLen)));
+    return json?.asset?.extras?.origamiGenerator?.rings || null;
+  } catch {
+    return null;
+  }
+}
+
 
 // Material base compartido — cada mesh recibe un clone()
 export const baseMaterial = new THREE.MeshStandardMaterial({
@@ -79,6 +96,7 @@ export function loadGLBFromBuffer(buffer) {
   }
 
   originalGLBBuffer = buffer.slice(0);
+  generatorRingsFromFile = readGeneratorMetadata(originalGLBBuffer);
 
   loader.parse(originalGLBBuffer.slice(0), '', gltf => {
     if (glbModel) scene.remove(glbModel);
@@ -149,10 +167,18 @@ export function adoptGeneratedGroup(group) {
     uuidToMesh.set(child.uuid, child);
   });
 
-  const center = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3());
-  controls.target.copy(center);
   controls.update();
-  resetCamera();
   resizeGuidePlanes(group);
   onLoadCallbacks.forEach(cb => cb(group));
+}
+
+export function setModelVisibility(visible) {
+  if (!glbModel) return;
+  glbModel.visible = visible;
+}
+
+
+// Alias defensivo para evitar errores por diferencias de mayúsculas/minúsculas
+export function setmodelvisibility(visible) {
+  setModelVisibility(visible);
 }
