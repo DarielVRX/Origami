@@ -5,7 +5,7 @@
 
 import { checkFileExists } from './github.js';
 import { loadGLBFromFile, loadGLBFromGitHub }  from './model.js';
-import { doExportGLB, doExportImage }           from './export.js';
+import { doExportGLB, doExportGLBLocal, doExportImage }  from './export.js';
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { camera as _cam, controls as _ctrl }   from './scene.js';
 import {
@@ -450,29 +450,29 @@ async function extractBaseModule() {
 export function setBottomButtonsVisible(visible) {
   const v = visible ? 'visible' : 'hidden';
   const fg = document.getElementById('fab-group');
-  const fc = document.getElementById('fab-cam');
   const gb = document.getElementById('gen-btn');
+  const gr = document.getElementById('grid-btn');
+  ['orbit','pan','zoom'].forEach(id => {
+    const p = document.getElementById(`cam-pad-${id}`);
+    if (p) p.style.visibility = v;
+  });
   if (fg) fg.style.visibility = v;
-  if (fc) fc.style.visibility = v;
   if (gb) gb.style.visibility = v;
+  if (gr) gr.style.visibility = v;
 }
 
-// Ocultar solo los otros dos botones al activar uno
-// name: 'fab' | 'joystick' | 'gen'
+// name: 'fab' | 'gen' | null(restore)
 export function activateExclusive(name) {
   const fg = document.getElementById('fab-group');
-  const fc = document.getElementById('fab-cam');
   const gb = document.getElementById('gen-btn');
-  // Ocultar pads si no es joystick activo
-  if (name !== 'joystick') {
-    ['orbit','pan','zoom'].forEach(id => {
-      const p = document.getElementById(`cam-pad-${id}`);
-      if (p) p.style.display = 'none';
-    });
-  }
-  if (fg) fg.style.visibility = (name === 'fab'      ? 'visible' : 'hidden');
-  if (fc) fc.style.visibility = (name === 'joystick' ? 'visible' : 'hidden');
-  if (gb) gb.style.visibility = (name === 'gen'      ? 'visible' : 'hidden');
+  const gr = document.getElementById('grid-btn');
+  ['orbit','pan','zoom'].forEach(id => {
+    const p = document.getElementById(`cam-pad-${id}`);
+    if (p) p.style.visibility = (name === null ? 'visible' : 'hidden');
+  });
+  if (fg) fg.style.visibility = (name === 'fab' || name === null) ? 'visible' : 'hidden';
+  if (gb) gb.style.visibility = (name === 'gen' || name === null) ? 'visible' : 'hidden';
+  if (gr) gr.style.visibility = (name === null ? 'visible' : 'hidden');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -481,19 +481,10 @@ export function closeAll() {
   document.getElementById('brush-panel')?.classList.remove('visible');
   document.getElementById('palette-popup')?.classList.remove('visible');
   document.getElementById('palette-div')?.classList.remove('visible');
-  // Ocultar pads independientes
-  ['orbit','pan','zoom'].forEach(id => {
-    const p = document.getElementById(`cam-pad-${id}`);
-    if (p) p.style.display = 'none';
-  });
   document.getElementById('fab-main')?.classList.remove('open');
   document.getElementById('fab-children')?.classList.remove('open');
-  const fg = document.getElementById('fab-group');
-  if (fg) fg.style.visibility = 'visible';
-  const fc = document.getElementById('fab-cam');
-  if (fc) fc.style.visibility = 'visible';
-  const gb = document.getElementById('gen-btn');
-  if (gb) gb.style.visibility = 'visible';
+  // Restaurar todos los botones
+  activateExclusive(null);
   if (typeof _resetFabOpen === 'function') _resetFabOpen();
   _closeAllHooks.forEach(fn => fn());
 }
@@ -529,11 +520,6 @@ export function buildUI({} = {}) {
   addLabel('GitHub');
   addMenuBtn('☁️', 'Cargar desde GitHub',  () => { closeAll(); askGitHubFile(); });
 
-  // ── TEMPORAL: extraer módulo base ── ELIMINAR DESPUÉS
-  addLabel('Utilidades');
-  addMenuBtn('🔩', 'Extraer Módulo Base',  () => { closeAll(); extractBaseModule(); });
-  // ── FIN TEMPORAL ──
-
   addLabel('Archivo');
   const loadInput = document.createElement('input');
   loadInput.type = 'file'; loadInput.accept = '.glb'; loadInput.id = 'load-glb-input';
@@ -549,6 +535,7 @@ export function buildUI({} = {}) {
 
   addLabel('Exportar');
   addMenuBtn('🖼️', 'Exportar Imagen 2×2',   () => { closeAll(); askFilename('collage_2x2', doExportImage); });
+  addMenuBtn('💾', 'Exportar GLB local',     () => { closeAll(); askFilename('ModeloGLB', name => doExportGLBLocal(name)); });
   addMenuBtn('📦', 'Exportar GLB → GitHub', () => { closeAll(); askFilename('ModeloGLB', name => doExportGLB(name)); });
 
   // ── FAB group ──
@@ -586,8 +573,11 @@ export function buildUI({} = {}) {
     fabOpen = !fabOpen;
     fabMain.classList.toggle('open', fabOpen);
     fabChildren.classList.toggle('open', fabOpen);
+    // 2.2 — al abrir +, ocultar joystick pads y gen-btn
+    if (fabOpen) activateExclusive('fab');
+    else         activateExclusive(null);
   };
-  fabMain.addEventListener('click', e => { e.stopPropagation(); toggleFab(); });
+  fabMain.addEventListener('click', e => { e.stopPropagation(); closeAll(); toggleFab(); });
 
   // ── Panel pincel ──
   const brushPanel = document.createElement('div');
@@ -673,7 +663,13 @@ export function buildUI({} = {}) {
     closeAll();
     if (!isOpen) {
       sideMenu.classList.add('open');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
+      // 9 — ocultar todo menos el contenido activo
+      activateExclusive(null); // restaurar primero, luego ocultar
+      ['orbit','pan','zoom'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
+      document.getElementById('fab-group').style.visibility = 'hidden';
+      document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
+      document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
+      fabOpen = true;
     }
   });
 
@@ -683,7 +679,12 @@ export function buildUI({} = {}) {
     closeAll();
     if (!isOpen) {
       brushPanel.classList.add('visible');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
+      // 9
+      ['orbit','pan','zoom'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
+      document.getElementById('fab-group').style.visibility = 'hidden';
+      document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
+      document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
+      fabOpen = true;
     }
   });
 
@@ -694,21 +695,20 @@ export function buildUI({} = {}) {
     if (!isOpen) {
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
-      activateExclusive('fab');
+      // 9
+      ['orbit','pan','zoom'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
+      document.getElementById('fab-group').style.visibility = 'hidden';
+      document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
+      document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
+      fabOpen = true;
     }
   });
 
-  // ── 3 botones joystick independientes (inferior izquierdo) ──
-  const fabCam = document.createElement('div');
-  fabCam.id = 'fab-cam'; fabCam.className = 'fab';
-  fabCam.setAttribute('data-tip', 'Cámara'); fabCam.textContent = '🕹️';
-  document.body.appendChild(fabCam);
-
+  // ── 3 botones joystick flotantes independientes (sin contenedor, siempre en pantalla) ──
   const MODES = [
-    { id: 'orbit', icon: '🌐', tip: 'Orbitar',  pos: 'left:24px;bottom:130px;'  },
-    { id: 'pan',   icon: '✥',  tip: 'Pan',      pos: 'left:112px;bottom:130px;' },
-    { id: 'zoom',  icon: '🔍', tip: 'Zoom',     pos: 'left:200px;bottom:130px;' },
+    { id: 'orbit', icon: '↻', tip: 'Orbitar',  pos: 'left:24px;bottom:24px;'   },
+    { id: 'pan',   icon: '✥', tip: 'Pan',       pos: 'left:112px;bottom:24px;'  },
+    { id: 'zoom',  icon: '🔍',tip: 'Zoom',      pos: 'left:200px;bottom:24px;'  },
   ];
 
   const padEls = {};
@@ -717,14 +717,37 @@ export function buildUI({} = {}) {
     const pad = document.createElement('div');
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
     pad.setAttribute('data-tip', tip);
-    pad.innerHTML = `<span>${icon}</span>`;
-    pad.style.cssText = `position:fixed;${pos}z-index:2000;display:none;`;
+    pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
+    pad.innerHTML = `<span style="font-size:${id==='orbit'?'34px':'26px'};font-style:normal;">${icon}</span>`;
     document.body.appendChild(pad);
     padEls[id] = pad;
 
     let active = false, lastX = 0, lastY = 0;
-    const start = (x, y) => { active = true; lastX = x; lastY = y; };
-    const move  = (x, y) => {
+
+    const startInteraction = (x, y) => {
+      if (active) return;
+      active = true; lastX = x; lastY = y;
+      // 2.1 — al mantener presionado, ocultar fab-group y gen-btn
+      const fg = document.getElementById('fab-group');
+      const gb = document.getElementById('gen-btn');
+      const gr = document.getElementById('grid-btn');
+      if (fg) fg.style.visibility = 'hidden';
+      if (gb) gb.style.visibility = 'hidden';
+      if (gr) gr.style.visibility = 'hidden';
+    };
+    const endInteraction = () => {
+      if (!active) return;
+      active = false;
+      // 2.4 — restaurar todos al soltar
+      const fg = document.getElementById('fab-group');
+      const gb = document.getElementById('gen-btn');
+      const gr = document.getElementById('grid-btn');
+      if (fg) fg.style.visibility = 'visible';
+      if (gb) gb.style.visibility = 'visible';
+      if (gr) gr.style.visibility = 'visible';
+    };
+
+    const move = (x, y) => {
       if (!active) return;
       const dx = x - lastX, dy = y - lastY;
       lastX = x; lastY = y;
@@ -748,36 +771,26 @@ export function buildUI({} = {}) {
         _ctrl.target.addScaledVector(right,  -dx * spd);
         _ctrl.target.addScaledVector(up,      dy * spd);
       } else {
-        const dir  = _cam.position.clone().sub(_ctrl.target).normalize();
+        const dir = _cam.position.clone().sub(_ctrl.target).normalize();
         const dist = _cam.position.distanceTo(_ctrl.target);
-        const nd   = Math.max(5, Math.min(300, dist + dy * 0.5));
+        // punto 7 — sin límite superior
+        const nd  = Math.max(1, dist + dy * 0.5);
         _cam.position.copy(_ctrl.target).addScaledVector(dir, nd);
       }
       _ctrl.update();
     };
-    const end = () => { active = false; };
 
-    pad.addEventListener('mousedown',  e => { e.stopPropagation(); start(e.clientX, e.clientY); });
+    pad.addEventListener('mousedown',  e => { e.stopPropagation(); startInteraction(e.clientX, e.clientY); });
     window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
-    window.addEventListener('mouseup',   end);
-    pad.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: false });
+    window.addEventListener('mouseup',   endInteraction);
+    pad.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); const t = e.touches[0]; startInteraction(t.clientX, t.clientY); }, { passive: false });
     window.addEventListener('touchmove', e => { if (active) { e.preventDefault(); const t = e.touches[0]; move(t.clientX, t.clientY); } }, { passive: false });
-    window.addEventListener('touchend', end);
-  });
-
-  // Mostrar/ocultar los 3 pads
-  const setPadsVisible = v => Object.values(padEls).forEach(p => { p.style.display = v ? 'flex' : 'none'; });
-
-  fabCam.addEventListener('click', e => {
-    e.stopPropagation();
-    const isOpen = padEls.orbit.style.display === 'flex';
-    closeAll();
-    if (!isOpen) { setPadsVisible(true); activateExclusive('joystick'); }
+    window.addEventListener('touchend', endInteraction);
   });
 
   // CSS joystick pads independientes
   document.head.insertAdjacentHTML('beforeend', `<style>
-#fab-cam { position:fixed; left:24px; bottom:24px; z-index:2000; }
+/* fab-cam removed — pads are standalone */
 .cam-pad {
   width:80px; height:80px; border-radius:50%;
   background:rgba(20,20,20,0.88); border:1px solid rgba(255,255,255,0.18);

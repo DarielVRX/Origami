@@ -4,7 +4,7 @@
 
 import * as THREE        from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { GLTFLoader }    from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
-import { scene }         from './scene.js';
+import { scene, resizeGuidePlanes } from './scene.js';
 import { activateExclusive } from './ui.js';
 
 // ── Constantes del modelo original ──
@@ -36,8 +36,8 @@ function ensureFixedState(ring) {
 // ── Modelo de anillo ──
 const defaultRing = () => ({
   id: Date.now(),
-  fixed:    { modules: true, arc: true, scale: true, radius: false },
-  _autoKey: 'radius',
+  fixed:    { modules: false, arc: true, scale: true, radius: true },
+  _autoKey: 'modules',
   modules:  20,
   arc:      360,
   scale:    1.0,
@@ -131,6 +131,7 @@ export async function generateStructure() {
   }
 
   scene.add(generatedGroup);
+  resizeGuidePlanes(generatedGroup);
   return generatedGroup;
 }
 
@@ -252,6 +253,9 @@ export function buildGeneratorPanel() {
   document.body.appendChild(panel);
 
   function renderPanel() {
+    // Point 3: preserve scroll position across re-renders
+    const scrollEl = panel.querySelector('#gen-scroll');
+    const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
     panel.innerHTML = '';
 
     // ── Header ──
@@ -262,7 +266,7 @@ export function buildGeneratorPanel() {
     hTitle.textContent = 'Generador';
     const hBtns = document.createElement('div'); hBtns.style.cssText = 'display:flex;gap:6px;align-items:center;';
     const prevBtn  = document.createElement('button'); prevBtn.className  = 'gen-preview'; prevBtn.textContent = '▶';
-    const applyBtn = document.createElement('button'); applyBtn.className = 'gen-apply';   applyBtn.textContent = '✓ Aplicar';
+    const applyBtn = document.createElement('button'); applyBtn.className = 'gen-apply';   applyBtn.textContent = '✓';
     const closeX   = document.createElement('div');
     closeX.textContent = '✕'; closeX.style.cssText = 'color:rgba(255,255,255,0.3);cursor:pointer;font-size:18px;padding:4px 8px;margin-left:4px;';
     closeX.addEventListener('click', closePanel);
@@ -361,6 +365,12 @@ export function buildGeneratorPanel() {
       scroll.appendChild(sec);
     });
 
+    // Restore scroll
+    requestAnimationFrame(() => {
+      const s = panel.querySelector('#gen-scroll');
+      if (s) s.scrollTop = savedScroll;
+    });
+
     // Añadir anillo
     const addRing = document.createElement('div'); addRing.className = 'gen-add-ring';
     addRing.textContent = '+ Añadir anillo';
@@ -379,7 +389,13 @@ export function buildGeneratorPanel() {
   genBtn.addEventListener('click', e => {
     e.stopPropagation();
     if (panel.classList.contains('open')) closePanel();
-    else { openPanel(); renderPanel(); activateExclusive('gen'); }
+    else {
+      openPanel(); renderPanel();
+      // 2.3 — ocultar todos los botones incluyendo gen-btn
+      activateExclusive('gen');
+      const gb = document.getElementById('gen-btn');
+      if (gb) gb.style.visibility = 'hidden';
+    }
   });
 
   return { genBtn, panel, openPanel, closePanel };

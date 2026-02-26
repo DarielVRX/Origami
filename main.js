@@ -3,28 +3,27 @@ import { autoLoadModel, meshColorMap, onModelLoad,
          adoptGeneratedGroup }                               from './model.js';
 import { initExport, setExportRefs }                         from './export.js';
 import { initPaintEvents, onEyedropperPick }                 from './paint.js';
-import { buildUI, showToast, setBottomButtonsVisible,
-         onCloseAll, activateExclusive }                             from './ui.js';
+import { buildUI, showToast, activateExclusive,
+         onCloseAll }                                        from './ui.js';
 import { buildGeneratorPanel, loadModuleBuffer,
          onGeneratorApply }                                  from './generator.js';
 
 // ── Construir UI ──
 const { brushCircle, onColorPicked } = buildUI({});
 
-// ── Generador — botón superior derecho ──
+// ── Generador ──
 const { genBtn, panel: genPanel, closePanel: closeGen } = buildGeneratorPanel();
 
-// Cuando closeAll dispara (clic en escena): cerrar panel generador y restaurar botones
+// Cuando closeAll dispara: cerrar panel generador y restaurar todos los botones
 onCloseAll(() => {
   closeGen();
-  setBottomButtonsVisible(true);
+  activateExclusive(null);
 });
 
-// Ocultar/mostrar botones al abrir/cerrar el panel generador
+// Al cerrar generador con su botón propio, restaurar todos
 genBtn.addEventListener('click', () => {
   requestAnimationFrame(() => {
-    if (genPanel.classList.contains('open')) activateExclusive('gen');
-    else setBottomButtonsVisible(true);
+    if (!genPanel.classList.contains('open')) activateExclusive(null);
   });
 });
 
@@ -46,7 +45,7 @@ onModelLoad(() => {
 onGeneratorApply(group => {
   adoptGeneratedGroup(group);
   import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
-  setBottomButtonsVisible(true);
+  activateExclusive(null);
 });
 
 // ── Cargar módulo base para el generador ──

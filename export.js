@@ -150,6 +150,19 @@ export function buildPatchedGLB() {
   return out;
 }
 
+// ── Exportar GLB solo local ──
+export async function doExportGLBLocal(filename) {
+  if (!_glbModel)       { alert('No hay modelo cargado.');              return; }
+  if (!_originalGLBBuf) { alert('El buffer original no está disponible.'); return; }
+  const buf = buildPatchedGLB();
+  if (!buf) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], { type: 'model/gltf-binary' }));
+  a.download = filename.endsWith('.glb') ? filename : filename + '.glb';
+  a.click();
+  _showToast('✅ GLB descargado localmente');
+}
+
 // ── Exportar GLB → GitHub + descarga local ──
 export async function doExportGLB(filename) {
   if (!_glbModel)       { alert('No hay modelo cargado.');              return; }

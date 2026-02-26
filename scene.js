@@ -81,6 +81,23 @@ window.addEventListener('toggleGrid', e => {
   planeYZ.visible = e.detail;
 });
 
+// ── Redimensionar planos guía al tamaño del contenido ──
+export function resizeGuidePlanes(group) {
+  if (!group) return;
+  const box  = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z) * 1.1; // 10% margen
+
+  planeXY.geometry.dispose();
+  planeXY.geometry = new THREE.PlaneGeometry(maxDim, maxDim);
+  planeXY.position.copy(center);
+
+  planeYZ.geometry.dispose();
+  planeYZ.geometry = new THREE.PlaneGeometry(maxDim, maxDim);
+  planeYZ.position.copy(center);
+}
+
 // ── Loop de render (exportado para que main.js lo arranque) ──
 export function startLoop() {
   (function animate() {

@@ -6,7 +6,7 @@
 import * as THREE      from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { GLTFLoader }  from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene, camera, controls } from './scene.js';
-import { resetCamera }            from './scene.js';
+import { resetCamera, resizeGuidePlanes } from './scene.js';
 import { downloadFromGitHub }      from './github.js';
 
 export let glbModel        = null;
@@ -153,5 +153,6 @@ export function adoptGeneratedGroup(group) {
   controls.target.copy(center);
   controls.update();
   resetCamera();
+  resizeGuidePlanes(group);
   onLoadCallbacks.forEach(cb => cb(group));
 }
