@@ -495,7 +495,11 @@ export function activateExclusive(name) {
 export function closeAll() {
   document.getElementById('side-menu')?.classList.remove('open');
   document.getElementById('brush-panel')?.classList.remove('visible');
+if (!palettePreviewActive) {
   document.getElementById('palette-popup')?.classList.remove('visible');
+  const p = document.getElementById('palette-popup');
+  if (p) p.style.display = 'none';
+}
   document.getElementById('palette-div')?.classList.remove('visible');
   document.getElementById('fab-main')?.classList.remove('open');
   document.getElementById('fab-children')?.classList.remove('open');
@@ -660,6 +664,8 @@ export function buildUI({} = {}) {
   brushCircle.id = 'brush-circle';
   document.body.appendChild(brushCircle);
 
+let palettePreviewActive = false;
+  
   // ── Paleta ──
   const palettePopup = document.createElement('div');
   palettePopup.id = 'palette-popup';
@@ -951,8 +957,9 @@ export function buildUI({} = {}) {
   let palettePreviewTimeout = null;
 const showPalettePreview = (color) => {
 
-  palettePopup.style.display = 'flex';
+  palettePreviewActive = true;
 
+  palettePopup.style.display = 'flex';
   paletteDiv.classList.remove('visible');
 
   currentColorPreview.style.background = color;
@@ -962,7 +969,8 @@ const showPalettePreview = (color) => {
   clearTimeout(palettePreviewTimeout);
   palettePreviewTimeout = setTimeout(() => {
     if (!paletteDiv.classList.contains('visible-sticky')) {
-      palettePopup.classList.remove('visible');
+      palettePopup.style.display = 'none';
+      palettePreviewActive = false;
     }
   }, 1500);
 };
