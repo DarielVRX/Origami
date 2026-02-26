@@ -949,10 +949,12 @@ export function buildUI({} = {}) {
   });
   // ── Scroll wheel: recorrer paleta ──
   let palettePreviewTimeout = null;
-  const showPalettePreview = (color) => {
-  palettePopup.classList.add('visible');
+const showPalettePreview = (color) => {
 
-  // 🔥 NO abrir la paleta completa
+  // ⚠️ NO tocar fab-group
+  // ⚠️ NO tocar otros botones
+
+  palettePopup.classList.add('visible');
   paletteDiv.classList.remove('visible');
 
   currentColorPreview.style.background = color;
@@ -963,7 +965,6 @@ export function buildUI({} = {}) {
   palettePreviewTimeout = setTimeout(() => {
     if (!paletteDiv.classList.contains('visible-sticky')) {
       palettePopup.classList.remove('visible');
-    setBottomButtonsVisible(true);
     }
   }, 1500);
 };
@@ -978,15 +979,11 @@ export function buildUI({} = {}) {
   ];
   let currentColorIndex = 0;
 
-  document.addEventListener('wheel', e => {
-    if (e.target.closest('#gen-panel, #side-menu, #brush-panel, #gen-scroll')) return;
-    e.preventDefault();
 document.addEventListener('wheel', e => {
   if (e.target.closest('#gen-panel, #side-menu, #brush-panel, #gen-scroll')) return;
 
   e.preventDefault();
-  setBottomButtonsVisible(false);
-  if (fabPalette) fabPalette.style.visibility = 'visible';
+
   const dir = e.deltaY > 0 ? 1 : -1;
   currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
 
