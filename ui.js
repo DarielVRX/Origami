@@ -596,7 +596,10 @@ export function buildUI({} = {}) {
     setBrushSize(s);
     brushSizeDisplay.textContent = `Tamaño: ${s}`;
   });
-  brushSlider.addEventListener('change', () => brushPanel.classList.remove('visible'));
+  brushSlider.addEventListener('change', () => {
+    brushPanel.classList.remove('visible');
+    closeAll();
+  });
 
   const brushCircle = document.createElement('div');
   brushCircle.id = 'brush-circle';

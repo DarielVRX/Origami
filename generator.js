@@ -267,8 +267,9 @@ export function buildGeneratorPanel() {
     const hBtns = document.createElement('div'); hBtns.style.cssText = 'display:flex;gap:6px;align-items:center;';
     const prevBtn  = document.createElement('button'); prevBtn.className  = 'gen-preview'; prevBtn.textContent = '▶';
     const applyBtn = document.createElement('button'); applyBtn.className = 'gen-apply';   applyBtn.textContent = '✓';
-    const closeX   = document.createElement('div');
-    closeX.textContent = '✕'; closeX.style.cssText = 'color:rgba(255,255,255,0.3);cursor:pointer;font-size:18px;padding:4px 8px;margin-left:4px;';
+    const closeX   = document.createElement('button');
+    closeX.textContent = '✕';
+    closeX.style.cssText = "width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);cursor:pointer;font-size:16px;";
     closeX.addEventListener('click', closePanel);
     prevBtn.addEventListener('click',  () => generateStructure().catch(e => alert(e.message)));
     applyBtn.addEventListener('click', () => applyGenerated(closePanel));
@@ -383,18 +384,26 @@ export function buildGeneratorPanel() {
     scroll.appendChild(addRing);
   }
 
-  const openPanel  = ()  => { panel.classList.add('open'); };
-  const closePanel = ()  => { panel.classList.remove('open'); disposeGeneratedGroup(); };
+  const openPanel  = ()  => {
+    panel.classList.add('open');
+    activateExclusive('gen');
+    const gb = document.getElementById('gen-btn');
+    if (gb) gb.style.visibility = 'hidden';
+  };
+  const closePanel = ()  => {
+    panel.classList.remove('open');
+    disposeGeneratedGroup();
+    activateExclusive(null);
+    const gb = document.getElementById('gen-btn');
+    if (gb) gb.style.visibility = 'visible';
+  };
 
   genBtn.addEventListener('click', e => {
     e.stopPropagation();
     if (panel.classList.contains('open')) closePanel();
     else {
-      openPanel(); renderPanel();
-      // 2.3 — ocultar todos los botones incluyendo gen-btn
-      activateExclusive('gen');
-      const gb = document.getElementById('gen-btn');
-      if (gb) gb.style.visibility = 'hidden';
+      renderPanel();
+      openPanel();
     }
   });
 
