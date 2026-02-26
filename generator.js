@@ -98,7 +98,7 @@ export async function generateStructure() {
   generatedGroup = new THREE.Group();
   const geometry = await getModuleGeometry();
 
-  for (const ring of rings) {
+  for (const [idx, ring] of rings.entries()) {
     computeFree(ring);
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
     const effectiveRadius = BASE_RADIUS * scale * radius;
@@ -120,6 +120,7 @@ export async function generateStructure() {
         pivot.position.y = y;
 
         const mesh = new THREE.Mesh(geometry, mat.clone());
+        mesh.userData.ringId = `ring:${idx}`;
         mesh.scale.setScalar(scale);
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
         mesh.position.x = BASE_RADIUS * (radius - 1);
