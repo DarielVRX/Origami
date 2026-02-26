@@ -6,7 +6,7 @@ import { initPaintEvents, onEyedropperPick }                 from './paint.js';
 import { buildUI, showToast, activateExclusive,
          onCloseAll }                                        from './ui.js';
 import { buildGeneratorPanel, loadModuleBuffer,
-         onGeneratorApply }                                  from './generator.js';
+         onGeneratorApply, setGeneratorRingsSnapshot }       from './generator.js';
 
 // ── Construir UI ──
 const { brushCircle, onColorPicked } = buildUI({});
@@ -38,14 +38,21 @@ onEyedropperPick(onColorPicked);
 
 // ── Cuando carga un modelo nuevo → actualizar refs en export ──
 onModelLoad(() => {
-  import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
+  import('./model.js').then(m => {
+    setExportRefs(m.glbModel, m.originalGLBBuffer);
+    if (Array.isArray(m.generatorRingsFromFile) && m.generatorRingsFromFile.length) {
+      setGeneratorRingsSnapshot(m.generatorRingsFromFile);
+    }
+  });
 });
 
 // ── Aplicar estructura generada → modo paint ──
 onGeneratorApply(group => {
   adoptGeneratedGroup(group);
   import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
-  activateExclusive(null);
+  const panelOpen = genPanel.classList.contains('open');
+  const inPreview = document.body.classList.contains('gen-preview-active');
+  if (!panelOpen && !inPreview) activateExclusive(null);
 });
 
 // ── Cargar módulo base para el generador ──
