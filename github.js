@@ -16,7 +16,8 @@ const GH_HEADERS = {
 
 // ── Verificar si un archivo existe en el repo ──
 export async function checkFileExists(filename) {
-  const path = filename.endsWith('.glb') ? filename : filename + '.glb';
+  const clean = filename.trim().replace(/\.glb$/i, '');
+  const path = clean + '.glb';
   try {
     const res = await fetch(
       `https://api.github.com/repos/${GH_REPO}/contents/${path}`,
@@ -30,7 +31,8 @@ export async function checkFileExists(filename) {
 
 // ── Subir ArrayBuffer como archivo al repo ──
 export async function uploadToGitHub(arrayBuffer, filename) {
-  const path = filename.endsWith('.glb') ? filename : filename + '.glb';
+  const clean = filename.trim().replace(/\.glb$/i, '');
+  const path = clean + '.glb';
   const apiUrl = `https://api.github.com/repos/${GH_REPO}/contents/${path}`;
 
   // ArrayBuffer → base64
@@ -66,7 +68,8 @@ export async function uploadToGitHub(arrayBuffer, filename) {
 
 // ── Descargar ArrayBuffer desde el repo ──
 export async function downloadFromGitHub(filename) {
-  const path = filename.endsWith('.glb') ? filename : filename + '.glb';
+  const clean = filename.trim().replace(/\.glb$/i, '');
+  const path = clean + '.glb';
   const res = await fetch(
     `https://api.github.com/repos/${GH_REPO}/contents/${path}`,
     { headers: { ...GH_HEADERS, 'Accept': 'application/vnd.github.raw+json' } }
