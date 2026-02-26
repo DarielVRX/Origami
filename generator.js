@@ -61,6 +61,7 @@ const defaultRing = () => ({
 
 let rings = [defaultRing()];
 let _renderGeneratorPanel = null;
+let _exitPreviewMode = () => {};
 
 
 export function getGeneratorRingsSnapshot() {
@@ -375,6 +376,7 @@ export function buildGeneratorPanel() {
     const gb = document.getElementById('gen-btn');
     if (gb) gb.style.visibility = 'visible';
   }
+  _exitPreviewMode = exitPreviewMode;
 
   function renderPanel() {
     _renderGeneratorPanel = renderPanel;
@@ -571,6 +573,6 @@ async function applyGenerated() {
     setRingVisible(idx, ring.visible !== false);
     setRingLocked(idx, ring.visible === false ? true : ring.locked);
   });
-  exitPreviewMode();
+  _exitPreviewMode();
   generatedGroup = null;
 }

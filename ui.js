@@ -64,6 +64,16 @@ body { overflow:hidden; }
 }
 #fab-children.open { max-height:400px; opacity:1; }
 
+@media (orientation: landscape) and (max-height: 560px) {
+  #fab-group { flex-direction:row; right:16px; bottom:16px; gap:10px; }
+  #fab-children {
+    flex-direction:row; align-items:center;
+    max-height:none; max-width:0; opacity:0;
+    transition:max-width 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+  }
+  #fab-children.open { max-width:360px; opacity:1; }
+}
+
 .fab[data-tip] { position:relative; }
 .fab[data-tip]::after {
   content:attr(data-tip);
@@ -728,10 +738,13 @@ export function buildUI({} = {}) {
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};
 
-  const createPad = ({ id, icon, tip, pos, fontSize = '26px' }) => {
+  const createPad = cfg => {
+    const id = cfg.id;
+    const icon = cfg.icon;
+    const pos = cfg.pos;
+    const fontSize = cfg.fontSize || '26px';
     const pad = document.createElement('div');
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
-    pad.setAttribute('data-tip', tip);
     pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
     const iconEl = document.createElement('span');
     iconEl.style.fontSize = fontSize;
@@ -743,14 +756,13 @@ export function buildUI({} = {}) {
     return pad;
   };
 
-  createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
-  createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
-  createPad({ id: 'zoom', icon: '🔍', tip: 'Zoom', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'orbit', icon: '↻', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
+  createPad({ id: 'pan', icon: '✥', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'zoom', icon: '🔍', pos: 'left:24px;bottom:112px;' });
 
   const camStackBtn = document.createElement('div');
   camStackBtn.className = 'cam-pad cam-stack-toggle';
   camStackBtn.id = 'cam-pad-stack-toggle';
-  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
   camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
   camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
   document.body.appendChild(camStackBtn);
@@ -874,6 +886,11 @@ export function buildUI({} = {}) {
 }
 #cam-pad-pan.open  { opacity:1; pointer-events:auto; transform:translateY(-88px); }
 #cam-pad-zoom.open { opacity:1; pointer-events:auto; transform:translateY(-168px); }
+
+@media (orientation: landscape) and (max-height: 560px) {
+  #cam-pad-pan.open  { transform:translateX(88px); }
+  #cam-pad-zoom.open { transform:translateX(168px); }
+}
 #fab-lock { display:none; }
 
 #grid-btn {
