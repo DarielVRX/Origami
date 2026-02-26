@@ -168,8 +168,10 @@ else if (ring._autoKey === 'arc') ring.arc = clampArc(ring.modules, ring.scale, 
 else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
 else ring.radius = clampRadius(ring.modules, ring.arc, ring.scale);
   });
-
-  ['modules','arc','scale','radius'].forEach(k => { if (ring.fixed[k]) ring[k] = prev[k]; });
+  
+['modules','arc','scale','radius'].forEach(k => {
+  ring[k] = roundStep(ring[k], STEP[k] ?? 0.1);
+});
 
   ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules, ring.arc), maxOriginOffset(ring.modules, ring.arc));
 }
@@ -387,8 +389,12 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
   btnM.disabled = readonly;
   btnP.disabled = readonly;
 
-const stepArc = 0.5; // paso definido por tu fórmula
-const stepRadius = 0.1; // paso definido por tu fórmula
+const STEP = {
+  modules: 1,      // siempre múltiplos de 1
+  arc: 0.5,        // pasos de 0.5°
+  scale: 0.1,      // pasos de 0.1
+  radius: 0.1,     // pasos de 0.1
+};
 
 const apply = v => {
   const parsed = parseFloat(v);
