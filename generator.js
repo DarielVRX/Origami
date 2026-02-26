@@ -10,7 +10,7 @@ import { setRingLocked, setRingVisible, setPaintInteractionsEnabled } from './pa
 import { setModelVisibility, glbModel } from './model.js';
 
 // ── Constantes del modelo original ──
-const K              = 20 / 360;   // módulos / (arc * BASE_RADIUS * scale * radius)
+const K              = 20 / 360 / 17;   // módulos / (arc * BASE_RADIUS * scale * radius)
 const BASE_RADIUS    = 17;
 const OVERLAP_BASE   = 1.4;
 const V_SPACING_BASE = 3.5;
