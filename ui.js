@@ -835,6 +835,7 @@ export function buildUI({} = {}) {
       if (inPreview) {
         if (fg) fg.style.visibility = 'hidden';
         if (gr) gr.style.visibility = 'hidden';
+        if (gb) gb.style.visibility = 'visible';
         return;
       }
       if (fg) fg.style.visibility = 'visible';
@@ -949,20 +950,22 @@ export function buildUI({} = {}) {
   // ── Scroll wheel: recorrer paleta ──
   let palettePreviewTimeout = null;
   const showPalettePreview = (color) => {
-    palettePopup.classList.add('visible');
-    paletteDiv.classList.add('visible');
-    currentColorPreview.style.background = color;
-    fabPalette.style.background = color;
-    setCurrentColor(color);
-    clearTimeout(palettePreviewTimeout);
-    palettePreviewTimeout = setTimeout(() => {
-      if (!paletteDiv.classList.contains('visible-sticky')) {
-        palettePopup.classList.remove('visible');
-        paletteDiv.classList.remove('visible');
-      }
-    }, 1500);
-  };
+  palettePopup.classList.add('visible');
 
+  // 🔥 NO abrir la paleta completa
+  paletteDiv.classList.remove('visible');
+
+  currentColorPreview.style.background = color;
+  fabPalette.style.background = color;
+  setCurrentColor(color);
+
+  clearTimeout(palettePreviewTimeout);
+  palettePreviewTimeout = setTimeout(() => {
+    if (!paletteDiv.classList.contains('visible-sticky')) {
+      palettePopup.classList.remove('visible');
+    }
+  }, 1500);
+};
   const allColors = ['#000000', '#888888', '#ffffff',
     ...Array.from({ length: 97 }, (_, i) => {
       const h = (i / 97) * 360, s = 80, l = 50;
