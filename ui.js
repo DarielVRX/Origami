@@ -1213,6 +1213,10 @@ export function buildUI({} = {}) {
     brushPanel.classList.remove('visible');
     closeAll();
   });
+  brushSlider.addEventListener('change', () => {
+    brushPanel.classList.remove('visible');
+    closeAll();
+  });
 
   const brushCircle = document.createElement('div');
 
@@ -1415,8 +1419,6 @@ export function buildUI({} = {}) {
       fabOpen = true;
 
     }
-
-  });
 
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};

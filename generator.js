@@ -60,6 +60,44 @@ const defaultRing = () => ({
 });
 
 let rings = [defaultRing()];
+let _renderGeneratorPanel = null;
+
+
+export function getGeneratorRingsSnapshot() {
+  return rings.map(r => ({
+    fixed: { ...r.fixed },
+    locked: !!r.locked,
+    visible: r.visible !== false,
+    _autoKey: r._autoKey,
+    modules: r.modules,
+    arc: r.arc,
+    scale: r.scale,
+    radius: r.radius,
+    layers: r.layers,
+    yOffset: r.yOffset,
+    originModule: r.originModule,
+  }));
+}
+
+export function setGeneratorRingsSnapshot(snapshot) {
+  if (!Array.isArray(snapshot) || !snapshot.length) return;
+  rings = snapshot.map(src => ({
+    ...defaultRing(),
+    fixed: { ...defaultRing().fixed, ...(src.fixed || {}) },
+    locked: !!src.locked,
+    visible: src.visible !== false,
+    _autoKey: src._autoKey || defaultRing()._autoKey,
+    modules: Number(src.modules ?? defaultRing().modules),
+    arc: Number(src.arc ?? defaultRing().arc),
+    scale: Number(src.scale ?? defaultRing().scale),
+    radius: Number(src.radius ?? defaultRing().radius),
+    layers: Number(src.layers ?? defaultRing().layers),
+    yOffset: Number(src.yOffset ?? defaultRing().yOffset),
+    originModule: Number(src.originModule ?? defaultRing().originModule),
+  }));
+  rings.forEach(computeFree);
+  if (typeof _renderGeneratorPanel === 'function') _renderGeneratorPanel();
+}
 
 // ── Solver ──
 // Relación: modules = K * arc * BASE_RADIUS * scale * radius
@@ -322,8 +360,10 @@ export function buildGeneratorPanel() {
     activateExclusive(null);
     const fg = document.getElementById('fab-group');
     const gr = document.getElementById('grid-btn');
+    const gb = document.getElementById('gen-btn');
     if (fg) fg.style.visibility = 'hidden';
     if (gr) gr.style.visibility = 'hidden';
+    if (gb) gb.style.visibility = 'hidden';
   }
 
   function exitPreviewMode() {
@@ -331,9 +371,13 @@ export function buildGeneratorPanel() {
     previewToggle.style.display = 'none';
     setPaintInteractionsEnabled(true);
     setModelVisibility(true);
+    const gb = document.getElementById('gen-btn');
+    if (gb) gb.style.visibility = 'visible';
   }
 
   function renderPanel() {
+    _renderGeneratorPanel = renderPanel;
+    // Point 3: preserve scroll position across re-renders
     const scrollEl = panel.querySelector('#gen-scroll');
     const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
     panel.innerHTML = '';
@@ -351,7 +395,7 @@ export function buildGeneratorPanel() {
     closeX.style.cssText = "width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);cursor:pointer;font-size:16px;";
     closeX.addEventListener('click', closePanel);
     prevBtn.addEventListener('click',  () => generateStructure().then(enterPreviewMode).catch(e => alert(e.message)));
-    applyBtn.addEventListener('click', () => applyGenerated(closePanel));
+    applyBtn.addEventListener('click', () => applyGenerated().catch(e => alert(e.message)));
     hBtns.append(prevBtn, applyBtn, closeX);
     hdr.append(hTitle, hBtns);
     panel.appendChild(hdr);
@@ -515,9 +559,9 @@ export function buildGeneratorPanel() {
 let _onApply = null;
 export function onGeneratorApply(fn) { _onApply = fn; }
 
-function applyGenerated(closeFn) {
+async function applyGenerated() {
   if (!generatedGroup || !generatedGroup.children.length) {
-    alert('Genera una vista previa primero.'); return;
+    await generateStructure();
   }
   if (_onApply) _onApply(generatedGroup);
   rings.forEach((ring, idx) => {
@@ -526,5 +570,4 @@ function applyGenerated(closeFn) {
   });
   exitPreviewMode();
   generatedGroup = null;
-  closeFn();
 }
