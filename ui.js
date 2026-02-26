@@ -375,8 +375,9 @@ function askGitHubFile() {
     const name = input.value.trim();
     if (!name) return;
     close();
-    loadGLBFromGitHub(name)
-      .then(() => showToast(`✅ Cargado desde GitHub: ${name}.glb`))
+    const cleanName = name.trim().replace(/\.glb$/i, '');
+    loadGLBFromGitHub(cleanName)
+      .then(() => showToast(`✅ Cargado desde GitHub: ${cleanName}.glb`))
       .catch(e  => showToast(`⚠️ Error: ${e.message}`, 5000));
   });
   input.addEventListener('keydown', e => {
@@ -522,8 +523,29 @@ const _closeAllHooks = [];
 export function registerFabReset(fn) { _resetFabOpen = fn; }
 export function onCloseAll(fn) { _closeAllHooks.push(fn); }
 
+
+// ── Restaurar snapshot del generador desde metadata GLB ──
+function _tryRestoreGeneratorMetadata(buffer) {
+  try {
+    const view = new DataView(buffer);
+    if (view.getUint32(0, true) !== 0x46546C67) return;
+    const jsonLen = view.getUint32(12, true);
+    const jsonBytes = new Uint8Array(buffer, 20, jsonLen);
+    const gltf = JSON.parse(new TextDecoder().decode(jsonBytes));
+    const rings = gltf?.asset?.extras?.origamiGenerator?.rings;
+    if (rings) {
+      import('./generator.js').then(m => {
+        m.setGeneratorRingsSnapshot(rings);
+        showToast('✅ Parámetros del generador restaurados');
+      });
+    }
+  } catch (e) {
+    // no metadata, silent
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
-// buildUI — construye toda la UI (llamar desde main.js)
+// buildUI — construye toda la UI
 // Retorna { brushCircle, currentColorBtn } para usarlos en otros módulos
 // ─────────────────────────────────────────────────────────────
 export function buildUI({} = {}) {
@@ -924,6 +946,108 @@ export function buildUI({} = {}) {
     // Notificar a scene via custom event
     window.dispatchEvent(new CustomEvent('toggleGrid', { detail: gridVisible }));
   });
+  // ── Scroll wheel: recorrer paleta ──
+  let palettePreviewTimeout = null;
+  const showPalettePreview = (color) => {
+    palettePopup.classList.add('visible');
+    paletteDiv.classList.add('visible');
+    currentColorPreview.style.background = color;
+    fabPalette.style.background = color;
+    setCurrentColor(color);
+    clearTimeout(palettePreviewTimeout);
+    palettePreviewTimeout = setTimeout(() => {
+      if (!paletteDiv.classList.contains('visible-sticky')) {
+        palettePopup.classList.remove('visible');
+        paletteDiv.classList.remove('visible');
+      }
+    }, 1500);
+  };
+
+  const allColors = ['#000000', '#888888', '#ffffff',
+    ...Array.from({ length: 97 }, (_, i) => {
+      const h = (i / 97) * 360, s = 80, l = 50;
+      const k = n => (n + h / 30) % 12;
+      const a = (s/100) * Math.min(l/100, 1 - l/100);
+      const f = n => Math.round(255 * (l/100 - a * Math.max(Math.min(k(n)-3, 9-k(n), 1), -1))).toString(16).padStart(2, '0');
+      return '#' + f(0) + f(8) + f(4);
+    })
+  ];
+  let currentColorIndex = 0;
+
+  document.addEventListener('wheel', e => {
+    if (e.target.closest('#gen-panel, #side-menu, #brush-panel, #gen-scroll')) return;
+    e.preventDefault();
+    const dir = e.deltaY > 0 ? 1 : -1;
+    currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
+    showPalettePreview(allColors[currentColorIndex]);
+  }, { passive: false });
+
+  // ── Middle mouse drag: cambiar tamaño de pincel ──
+  let middleActive = false, middleLastY = 0;
+  document.addEventListener('mousedown', e => {
+    if (e.button === 1) { e.preventDefault(); middleActive = true; middleLastY = e.clientY; }
+  });
+  document.addEventListener('mousemove', e => {
+    if (!middleActive) return;
+    const dy = e.clientY - middleLastY;
+    middleLastY = e.clientY;
+    const current = parseFloat(brushSlider.value);
+    const next = Math.max(1, Math.min(10, current - dy * 0.05));
+    brushSlider.value = next;
+    setBrushSize(next);
+    brushSizeDisplay.textContent = 'Tamaño: ' + next.toFixed(1);
+    // show only brush circle, no panel
+    brushCircle.style.display = 'block';
+  });
+  document.addEventListener('mouseup', e => { if (e.button === 1) middleActive = false; });
+
+  // ── Two-finger pinch: tamaño de pincel en móvil ──
+  let pinchDist = null;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      pinchDist = Math.hypot(dx, dy);
+    }
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && pinchDist !== null) {
+      const dx = e.touches[0].clientX - e.touches[1].clientX;
+      const dy = e.touches[0].clientY - e.touches[1].clientY;
+      const newDist = Math.hypot(dx, dy);
+      const delta = newDist - pinchDist;
+      pinchDist = newDist;
+      const current = parseFloat(brushSlider.value);
+      const next = Math.max(1, Math.min(10, current + delta * 0.02));
+      brushSlider.value = next;
+      setBrushSize(next);
+      brushSizeDisplay.textContent = 'Tamaño: ' + next.toFixed(1);
+    }
+  }, { passive: true });
+  document.addEventListener('touchend', e => { if (e.touches.length < 2) pinchDist = null; }, { passive: true });
+
+  // ── Two-finger swipe (horizontal): recorrer paleta en móvil ──
+  let swipeStartX = null, swipeStartY = null;
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length === 2) {
+      swipeStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      swipeStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+    }
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (e.touches.length === 2 && swipeStartX !== null) {
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const dx = cx - swipeStartX;
+      if (Math.abs(dx) > 8) {
+        const dir = dx > 0 ? -1 : 1;
+        currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
+        showPalettePreview(allColors[currentColorIndex]);
+        swipeStartX = cx;
+      }
+    }
+  }, { passive: true });
+  document.addEventListener('touchend', e => { if (e.touches.length < 2) { swipeStartX = null; swipeStartY = null; } }, { passive: true });
+
   return {
     brushCircle,
     currentColorBtn: currentColorPreview,  // alias para paint.js
