@@ -224,7 +224,7 @@ const CSS = `
   border:1px solid rgba(80,180,255,0.4); background:rgba(80,180,255,0.12); color:#6ab0ff; transition:background 0.15s;
 }
 .gen-preview:hover { background:rgba(80,180,255,0.25); }
-`;
+.gen-close {
   width:34px; height:34px; border-radius:8px; cursor:pointer;
   font-family:'Courier New',monospace; font-size:16px;
   border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08);
