@@ -156,3 +156,8 @@ export function adoptGeneratedGroup(group) {
   resizeGuidePlanes(group);
   onLoadCallbacks.forEach(cb => cb(group));
 }
+
+export function setModelVisibility(visible) {
+  if (!glbModel) return;
+  glbModel.visible = visible;
+}
