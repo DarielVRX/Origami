@@ -9,7 +9,7 @@ import { doExportGLB, doExportGLBLocal, doExportImage }  from './export.js';
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { camera as _cam, controls as _ctrl }   from './scene.js';
 import {
-  settColor, setBrushSize, setEyedropperActive,
+  setColor, setBrushSize, setEyedropperActive,
   eyedropperActive
 } from './paint.js';
 
