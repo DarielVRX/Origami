@@ -482,7 +482,7 @@ export function buildGeneratorPanel() {
         if (fg) fg.style.visibility = 'hidden';
         if (gr) gr.style.visibility = 'hidden';
         if (gb) gb.style.visibility = 'visible';   // gen-btn visible
-        ['orbit','pan','zoom'].forEach(id => {
+        ['orbit','stack-toggle'].forEach(id => {
           const p = document.getElementById('cam-pad-' + id);
           if (p) p.style.visibility = 'visible';   // pads visibles
         });
@@ -563,7 +563,7 @@ export function buildGeneratorPanel() {
 
       const defs = [
         { key: 'modules', label: 'Módulos',  min: 1,   max: 500, step: 1   },
-        { key: 'arc',     label: 'Arco (°)', min: 1,   max: 360, step: 0.5 },
+        { key: 'arc',     label: 'Arco (°)', min: 1,   max: 360, step: 1   },
         { key: 'scale',   label: 'Escala',   min: 0.1, max: 20,  step: 0.1 },
         { key: 'radius',  label: 'Radio ×',  min: 0.1, max: 20,  step: 0.1 },
       ];
