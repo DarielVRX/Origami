@@ -154,12 +154,12 @@ function computeFree(ring) {
   const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, 20);
   const calcRadius = (modules, arc, scale) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, 20);
 
-  const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
+const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
 
-  if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
-  else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
-else if (ring._autoKey === 'arc') ring.arc = clampArc(ring.modules, ring.scale, ring.radius);
-else ring.radius = clampRadius(ring.modules, ring.arc, ring.scale);
+if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
+else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
+else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
+else if (ring._autoKey === 'radius') ring.radius = calcRadius(ring.modules, ring.arc, ring.scale);
 
   const autoKeys = ['modules', 'arc', 'scale', 'radius'].filter(k => !ring.fixed[k] && k !== ring._autoKey);
   autoKeys.forEach(k => {
@@ -383,7 +383,6 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
   const inp  = document.createElement('input');
   inp.type = 'number'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
   // Mantener clase visual, pero permitir escritura
-if (readonly) inp.classList.add('computed'); 
   const btnP = document.createElement('button'); btnP.textContent = '+';
   btnM.disabled = readonly;
   btnP.disabled = readonly;
@@ -392,15 +391,12 @@ const stepArc = 0.5; // paso definido por tu fórmula
 const stepRadius = 0.1; // paso definido por tu fórmula
 
 const apply = v => {
-    const parsed = parseFloat(v);
-    const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
-    
-    // redondea solo al step correspondiente
-    const step = key === 'arc' ? stepArc : (key === 'radius' ? stepRadius : step);
-    const c = clampNumber(roundStep(base, step), min, max);
-    
-    inp.value = parseFloat(c.toFixed(10));
-    if (!readonly) onChange(c);
+  const parsed = parseFloat(v);
+  const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
+  const stepUsed = STEP[key] ?? step;   // STEP puede definirse con los pasos deseados
+  const c = clampNumber(roundStep(base, stepUsed), min, max);
+  inp.value = parseFloat(c.toFixed(10));
+  onChange(c);   // siempre llama
 };
 
   let holdTimer = null;
