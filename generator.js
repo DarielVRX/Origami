@@ -108,6 +108,7 @@ export async function generateStructure() {
   generatedGroup = new THREE.Group();
   const geometry = await getModuleGeometry();
 
+  for (const [idx, ring] of rings.entries()) {
     computeFree(ring);
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
     const effectiveRadius = BASE_RADIUS * scale * radius;
