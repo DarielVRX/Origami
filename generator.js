@@ -172,20 +172,14 @@ function recomputeYOffsets() {
 
     const prev = rings[i - 1];
     
-    // 1. Calculamos la altura acumulada de las capas del anillo anterior.
-    // Usamos la escala del anterior para determinar cuánto mide cada capa.
-    const layersHeight = (prev.layers * V_STEP_BASE) / Math.max(prev.scale, 0.0001);
+    // Calculamos el tamaño del paso basado en la escala del anillo anterior
+    const stepSizePrev = V_STEP_BASE / Math.max(prev.scale, 0.0001);
 
-    // 2. El "paso final" para posicionar el siguiente anillo.
-    // Según tu requerimiento, este último tramo también debe ser inversamente 
-    // proporcional a esa misma escala del anillo que acaba de terminar.
-    const finalStep = V_STEP_BASE / Math.max(prev.scale, 0.0001);
-
-    // 3. El nuevo offset es la base del anterior + sus capas + el paso proporcional
-    rings[i].yOffset = parseFloat((prev.yOffset + layersHeight).toFixed(2));
+    // El nuevo offset es:
+    // El inicio del anterior + (todas sus capas + el hueco final) * tamaño del paso
+    const totalIncrement = (prev.layers + 1) * stepSizePrev;
     
-    // Si quisieras que el offset fuera un paso MÁS allá de la última capa:
-    // rings[i].yOffset = parseFloat((prev.yOffset + layersHeight + finalStep).toFixed(2));
+    rings[i].yOffset = parseFloat((prev.yOffset + totalIncrement).toFixed(2));
   }
 }
 
