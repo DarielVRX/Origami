@@ -2,6 +2,7 @@
 // ui.js — FAB group, drawer lateral, paleta, modales, toast
 // Dependencias: github.js, model.js, export.js, paint.js
 // ─────────────────────────────────────────────────────────────
+
 import { checkFileExists } from './github.js';
 import { loadGLBFromFile, loadGLBFromGitHub }  from './model.js';
 import { doExportGLB, doExportGLBLocal, doExportImage }  from './export.js';
@@ -11,6 +12,7 @@ import {
   setCurrentColor, setBrushSize, setEyedropperActive,
   eyedropperActive
 } from './paint.js';
+
 // ─────────────────────────────────────────────────────────────
 // ESTILOS
 // ─────────────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ document.head.insertAdjacentHTML('beforeend', `<style>
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { overflow:hidden; }
+
 .fab {
   width:88px; height:88px; border-radius:50%;
   background:rgba(20,20,20,0.88);
@@ -43,6 +46,7 @@ body { overflow:hidden; }
 }
 .fab:hover  { background:rgba(50,50,50,0.95); transform:scale(1.07); }
 .fab:active { transform:scale(0.95); }
+
 #fab-group {
   position:fixed; bottom:24px; right:24px; z-index:2000;
   display:flex; flex-direction:column; align-items:center; gap:14px;
@@ -52,21 +56,14 @@ body { overflow:hidden; }
   transition:transform 0.3s cubic-bezier(0.4,0,0.2,1), background 0.2s;
 }
 #fab-main.open { transform:rotate(45deg) scale(1.07); }
+
 #fab-children {
   display:flex; flex-direction:column; align-items:center; gap:14px;
   overflow:hidden; max-height:0; opacity:0;
   transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
 }
 #fab-children.open { max-height:400px; opacity:1; }
-@media (orientation: landscape) and (max-height: 560px) {
-  #fab-group { flex-direction:row; right:16px; bottom:16px; gap:10px; }
-  #fab-children {
-    flex-direction:row; align-items:center;
-    max-height:none; max-width:0; opacity:0;
-    transition:max-width 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
-  }
-  #fab-children.open { max-width:360px; opacity:1; }
-}
+
 .fab[data-tip] { position:relative; }
 .fab[data-tip]::after {
   content:attr(data-tip);
@@ -79,10 +76,12 @@ body { overflow:hidden; }
   border:1px solid rgba(255,255,255,0.1);
 }
 .fab[data-tip]:hover::after { opacity:1; }
+
 #fab-lock.locked   { background:rgba(255,80,80,0.2); border-color:rgba(255,80,80,0.5); color:#ff6b6b; }
 #fab-lock .lock-icon { display:inline-block; }
 #fab-lock.locked   .lock-icon { animation:lockShake  0.4s ease; }
 #fab-lock.unlocked .lock-icon { animation:lockBounce 0.4s ease; }
+
 #side-menu {
   position:fixed; top:0; left:0; width:360px; height:100vh;
   background:rgba(18,18,18,0.97); backdrop-filter:blur(14px);
@@ -94,6 +93,7 @@ body { overflow:hidden; }
   overflow-y:auto;
 }
 #side-menu.open { transform:translateX(0); }
+
 .menu-label {
   font-family:'Courier New',monospace; font-size:11px;
   letter-spacing:2px; text-transform:uppercase;
@@ -112,6 +112,7 @@ body { overflow:hidden; }
 .menu-btn.active { background:rgba(255,80,80,0.18); border-color:rgba(255,80,80,0.45); color:#ff6b6b; }
 #load-glb-input { display:none; }
 label.menu-btn  { user-select:none; }
+
 #brush-panel {
   position:fixed; bottom:130px; right:130px; z-index:1800;
   background:rgba(18,18,18,0.94); border:1px solid rgba(255,255,255,0.12);
@@ -129,17 +130,21 @@ label.menu-btn  { user-select:none; }
   font-family:'Courier New',monospace; font-size:14px;
   color:rgba(255,255,255,0.5); text-align:right;
 }
+
 #brush-circle {
   position:fixed; border:2px solid rgba(255,60,60,0.85); border-radius:50%;
   pointer-events:none; opacity:0; transition:opacity 0.2s;
 }
+
 #palette-popup {
   position:fixed; bottom:130px; right:24px; z-index:1800;
   display:none; flex-direction:column; align-items:flex-end; gap:0;
 }
 #palette-popup.visible { display:flex; }
+
 /* El preview de color ahora ES el FAB de paleta — ver JS */
 #current-color-preview { display:none; }
+
 #palette-div {
   background:rgba(18,18,18,0.97);
   border:1px solid rgba(255,255,255,0.1); border-radius:12px;
@@ -148,6 +153,7 @@ label.menu-btn  { user-select:none; }
   display:none;
 }
 #palette-div.visible { display:grid; }
+
 #eyedropper-btn {
   grid-column:span 6; padding:9px;
   background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.13);
@@ -159,13 +165,16 @@ label.menu-btn  { user-select:none; }
 }
 #eyedropper-btn:hover  { background:rgba(255,220,80,0.15); border-color:rgba(255,220,80,0.4); color:#ffd84f; }
 #eyedropper-btn.active { background:rgba(255,220,80,0.25); border-color:#ffd84f; color:#ffd84f; }
+
 .color-swatch {
   width:40px; height:40px; border-radius:6px; cursor:pointer;
   border:1px solid rgba(255,255,255,0.04);
   transition:transform 0.1s, outline 0.1s;
 }
 .color-swatch:hover { transform:scale(1.18); outline:2px solid #ffd84f; }
+
 body.eyedropper-cursor * { cursor:crosshair !important; }
+
 .toast {
   position:fixed; bottom:160px; left:50%; transform:translateX(-50%);
   background:rgba(20,20,20,0.95); color:#fff; padding:12px 20px;
@@ -175,6 +184,7 @@ body.eyedropper-cursor * { cursor:crosshair !important; }
   animation:fadeInUp 0.2s ease; pointer-events:none;
 }
 </style>`);
+
 // ─────────────────────────────────────────────────────────────
 // TOAST
 // ─────────────────────────────────────────────────────────────
@@ -185,6 +195,7 @@ export function showToast(msg, duration = 3000) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), duration);
 }
+
 // ─────────────────────────────────────────────────────────────
 // HELPERS DE MODALES
 // ─────────────────────────────────────────────────────────────
@@ -202,6 +213,7 @@ function makeDialogBtn(text, bg, color, hoverBg) {
   btn.addEventListener('mouseleave', () => btn.style.background = bg);
   return btn;
 }
+
 function makeOverlay() {
   const el = document.createElement('div');
   el.style.cssText = `
@@ -211,6 +223,7 @@ function makeOverlay() {
   `;
   return el;
 }
+
 function makeBox() {
   const el = document.createElement('div');
   el.style.cssText = `
@@ -221,6 +234,7 @@ function makeBox() {
   `;
   return el;
 }
+
 function makeInput(placeholder = '', value = '') {
   const el = document.createElement('input');
   el.type        = 'text';
@@ -235,15 +249,18 @@ function makeInput(placeholder = '', value = '') {
   el.addEventListener('focus', () => el.select());
   return el;
 }
+
 // ─────────────────────────────────────────────────────────────
 // MODAL — Nombre de archivo (export)
 // ─────────────────────────────────────────────────────────────
 export function askFilename(defaultName, onConfirm) {
   const overlay = makeOverlay();
   const box     = makeBox();
+
   const title = document.createElement('div');
   title.textContent = 'Nombre del archivo';
   title.style.cssText = 'font-size:13px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.45);';
+
   const input   = makeInput('', defaultName);
   const warning = document.createElement('div');
   warning.style.cssText = `
@@ -252,10 +269,12 @@ export function askFilename(defaultName, onConfirm) {
     color:#ffb347; font-size:12px; line-height:1.5;
   `;
   warning.innerHTML = '⚠️ <strong>Este archivo ya existe en GitHub.</strong><br>Si continúas, será sobreescrito. El historial de Git conserva la versión anterior.';
+
   const row     = document.createElement('div');
   row.style.cssText = 'display:flex; gap:10px;';
   const cancel  = makeDialogBtn('Cancelar',    'rgba(255,255,255,0.06)', '#aaa',     'rgba(255,255,255,0.12)');
   const confirm = makeDialogBtn('Guardar',     'rgba(80,200,120,0.18)', '#6fdc9a', 'rgba(80,200,120,0.35)');
+
   let checkTimeout;
   const checkExists = () => {
     clearTimeout(checkTimeout);
@@ -269,6 +288,7 @@ export function askFilename(defaultName, onConfirm) {
     }, 400);
   };
   input.addEventListener('input', checkExists);
+
   const close = () => overlay.remove();
   cancel.addEventListener('click', close);
   confirm.addEventListener('click', () => { close(); onConfirm(input.value.trim() || defaultName); });
@@ -276,30 +296,36 @@ export function askFilename(defaultName, onConfirm) {
     if (e.key === 'Enter')  confirm.click();
     if (e.key === 'Escape') cancel.click();
   });
+
   row.append(cancel, confirm);
   box.append(title, input, warning, row);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
   setTimeout(() => { input.focus(); checkExists(); }, 50);
 }
+
 // ─────────────────────────────────────────────────────────────
 // MODAL — Cargar desde GitHub
 // ─────────────────────────────────────────────────────────────
 function askGitHubFile() {
   const overlay = makeOverlay();
   const box     = makeBox();
+
   const title = document.createElement('div');
   title.textContent = 'Cargar desde GitHub';
   title.style.cssText = 'font-size:20px; letter-spacing:2px; text-transform:uppercase; color:rgba(255,255,255,0.45);';
+
   const input  = makeInput('nombre del archivo (sin .glb)');
   const status = document.createElement('div');
   status.style.cssText = 'font-size:12px; min-height:18px; font-family:"Courier New",monospace; color:rgba(255,255,255,0.4);';
+
   const row    = document.createElement('div');
   row.style.cssText = 'display:flex; gap:10px;';
   const cancel = makeDialogBtn('Cancelar', 'rgba(255,255,255,0.06)', '#aaa',    'rgba(255,255,255,0.12)');
   const load   = makeDialogBtn('Cargar',   'rgba(60,140,255,0.18)', '#6ab0ff', 'rgba(60,140,255,0.35)');
   load.disabled     = true;
   load.style.opacity = '0.4';
+
   let checkTimeout;
   const checkExists = () => {
     clearTimeout(checkTimeout);
@@ -327,6 +353,7 @@ function askGitHubFile() {
     }, 400);
   };
   input.addEventListener('input', checkExists);
+
   const close = () => overlay.remove();
   cancel.addEventListener('click', close);
   load.addEventListener('click', () => {
@@ -341,26 +368,31 @@ function askGitHubFile() {
     if (e.key === 'Enter' && !load.disabled) load.click();
     if (e.key === 'Escape') cancel.click();
   });
+
   row.append(cancel, load);
   box.append(title, input, status, row);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
   setTimeout(() => input.focus(), 50);
 }
+
 // ─────────────────────────────────────────────────────────────
 // ── TEMPORAL: extraer mesh[482] como GLB independiente ── ELIMINAR DESPUÉS
 async function extractBaseModule() {
   const { originalGLBBuffer } = await import('./model.js');
   if (!originalGLBBuffer) { showToast('⚠️ Buffer no disponible'); return; }
+
   const buf  = originalGLBBuffer.slice(0);
   const view = new DataView(buf);
   const jLen = view.getUint32(12, true);
   const gltf = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jLen)));
   const binBase = 20 + jLen + 8;
+
   const MIDX = 482;
   const prim = gltf.meshes[MIDX].primitives[0];
   const usedAcc = [...Object.values(prim.attributes), ...(prim.indices != null ? [prim.indices] : [])];
   const usedBV  = [...new Set(usedAcc.map(ai => gltf.accessors[ai].bufferView))];
+
   const newBin = []; let binOff = 0;
   const bvOffMap = {};
   for (const bvi of usedBV.sort((a,b)=>a-b)) {
@@ -370,12 +402,14 @@ async function extractBaseModule() {
     newBin.push(chunk);
     binOff += bv.byteLength + ((4 - bv.byteLength % 4) % 4);
   }
+
   const bvRemap = {}; const newBVList = [];
   usedBV.sort((a,b)=>a-b).forEach((old,ni) => {
     bvRemap[old] = ni;
     const bv = gltf.bufferViews[old];
     newBVList.push({ buffer:0, byteOffset:bvOffMap[old], byteLength:bv.byteLength, ...(bv.byteStride?{byteStride:bv.byteStride}:{}) });
   });
+
   const accRemap = {}; const newAccList = [];
   usedAcc.forEach((oldAi, ni) => {
     accRemap[oldAi] = ni;
@@ -383,12 +417,15 @@ async function extractBaseModule() {
     newAccList.push({ bufferView:bvRemap[a.bufferView], componentType:a.componentType, count:a.count, type:a.type,
       ...(a.byteOffset>0?{byteOffset:a.byteOffset}:{}), ...(a.min?{min:a.min}:{}), ...(a.max?{max:a.max}:{}) });
   });
+
   const newPrim = { attributes: Object.fromEntries(Object.entries(prim.attributes).map(([k,v])=>[k,accRemap[v]])),
     ...(prim.indices!=null?{indices:accRemap[prim.indices]}:{}), material:0 };
+
   const newGltf = { asset:{version:'2.0'}, scene:0, scenes:[{nodes:[0]}], nodes:[{mesh:0,name:'ModuloBase'}],
     meshes:[{name:'ModuloBase',primitives:[newPrim]}], accessors:newAccList, bufferViews:newBVList,
     buffers:[{byteLength:binOff}],
     materials:[{pbrMetallicRoughness:{baseColorFactor:[0.667,0.667,0.667,1.0],metallicFactor:0,roughnessFactor:0.8},doubleSided:true}] };
+
   const jBytes = new TextEncoder().encode(JSON.stringify(newGltf));
   const jPad = Math.ceil(jBytes.length/4)*4;
   const bPad = Math.ceil(binOff/4)*4;
@@ -400,12 +437,15 @@ async function extractBaseModule() {
   ob.set(jBytes,o); ob.fill(0x20,o+jBytes.length,o+jPad); o+=jPad;
   ov.setUint32(o,bPad,true);o+=4; ov.setUint32(o,0x004E4942,true);o+=4;
   let bOff=o; for(const chunk of newBin){ ob.set(chunk,bOff); bOff+=chunk.byteLength+((4-chunk.byteLength%4)%4); }
+
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([out],{type:'model/gltf-binary'}));
   a.download = 'ModuloBase.glb'; a.click();
   showToast('✅ ModuloBase.glb descargado');
 }
 // ── FIN TEMPORAL ──
+
+
 // ─────────────────────────────────────────────────────────────
 export function setBottomButtonsVisible(visible) {
   const v = visible ? 'visible' : 'hidden';
@@ -420,6 +460,7 @@ export function setBottomButtonsVisible(visible) {
   if (gb) gb.style.visibility = v;
   if (gr) gr.style.visibility = v;
 }
+
 // name: 'fab' | 'gen' | null(restore)
 export function activateExclusive(name) {
   const fg = document.getElementById('fab-group');
@@ -433,6 +474,7 @@ export function activateExclusive(name) {
   if (gb) gb.style.visibility = (name === 'gen' || name === null) ? 'visible' : 'hidden';
   if (gr) gr.style.visibility = (name === null ? 'visible' : 'hidden');
 }
+
 // ─────────────────────────────────────────────────────────────
 export function closeAll() {
   document.getElementById('side-menu')?.classList.remove('open');
@@ -464,6 +506,7 @@ let _resetFabOpen = null;
 const _closeAllHooks = [];
 export function registerFabReset(fn) { _resetFabOpen = fn; }
 export function onCloseAll(fn) { _closeAllHooks.push(fn); }
+
 // ─────────────────────────────────────────────────────────────
 // buildUI — construye toda la UI (llamar desde main.js)
 // Retorna { brushCircle, currentColorBtn } para usarlos en otros módulos
@@ -473,6 +516,7 @@ export function buildUI({} = {}) {
   const sideMenu = document.createElement('div');
   sideMenu.id = 'side-menu';
   document.body.appendChild(sideMenu);
+
   const addLabel = text => {
     const el = document.createElement('div');
     el.className = 'menu-label'; el.textContent = text;
@@ -486,8 +530,10 @@ export function buildUI({} = {}) {
     sideMenu.appendChild(btn);
     return btn;
   };
+
   addLabel('GitHub');
   addMenuBtn('☁️', 'Cargar desde GitHub',  () => { closeAll(); askGitHubFile(); });
+
   addLabel('Archivo');
   const loadInput = document.createElement('input');
   loadInput.type = 'file'; loadInput.accept = '.glb'; loadInput.id = 'load-glb-input';
@@ -500,18 +546,22 @@ export function buildUI({} = {}) {
     if (e.target.files.length) loadGLBFromFile(e.target.files[0]);
     closeAll();
   });
+
   addLabel('Exportar');
   addMenuBtn('🖼️', 'Exportar Imagen 2×2',   () => { closeAll(); askFilename('collage_2x2', doExportImage); });
   addMenuBtn('💾', 'Exportar GLB local',     () => { closeAll(); askFilename('ModeloGLB', name => doExportGLBLocal(name)); });
   addMenuBtn('📦', 'Exportar GLB → GitHub', () => { closeAll(); askFilename('ModeloGLB', name => doExportGLB(name)); });
+
   // ── FAB group ──
   const fabGroup = document.createElement('div');
   fabGroup.id = 'fab-group';
   document.body.appendChild(fabGroup);
+
   // Hijos expandibles
   const fabChildren = document.createElement('div');
   fabChildren.id = 'fab-children';
   fabGroup.appendChild(fabChildren);
+
   const makeFabChild = (icon, tip) => {
     const btn = document.createElement('div');
     btn.className = 'fab';
@@ -524,11 +574,13 @@ export function buildUI({} = {}) {
   const fabBrush   = makeFabChild('✏️', 'Tamaño de pincel');
   const fabPalette = makeFabChild('', 'Paleta de colores');
   fabPalette.style.cssText += '; background:#ff0000; border:3px solid rgba(255,255,255,0.4);';
+
   // Botón + principal
   const fabMain = document.createElement('div');
   fabMain.id = 'fab-main'; fabMain.className = 'fab';
   fabMain.textContent = '+';
   fabGroup.appendChild(fabMain);
+
   let fabOpen = false;
   registerFabReset(() => { fabOpen = false; });
   const toggleFab = () => {
@@ -544,16 +596,19 @@ export function buildUI({} = {}) {
     if (fabOpen) closeAll();
     else { closeAll(); toggleFab(); }
   });
+
   // ── Panel pincel ──
   const brushPanel = document.createElement('div');
   brushPanel.id = 'brush-panel';
   document.body.appendChild(brushPanel);
+
   const brushLabelEl = document.createElement('label'); brushLabelEl.textContent = 'Tamaño de pincel';
   const brushSlider  = document.createElement('input');
   brushSlider.type = 'range'; brushSlider.min = '1'; brushSlider.max = '10'; brushSlider.value = '1';
   const brushSizeDisplay = document.createElement('div');
   brushSizeDisplay.id = 'brush-size-display'; brushSizeDisplay.textContent = 'Tamaño: 1';
   brushPanel.append(brushLabelEl, brushSlider, brushSizeDisplay);
+
   brushSlider.addEventListener('input', () => {
     const s = parseFloat(brushSlider.value);
     setBrushSize(s);
@@ -563,51 +618,34 @@ export function buildUI({} = {}) {
     brushPanel.classList.remove('visible');
     closeAll();
   });
-  brushSlider.addEventListener('change', () => {
-    brushPanel.classList.remove('visible');
-    closeAll();
-  });
-  brushSlider.addEventListener('change', () => {
-    brushPanel.classList.remove('visible');
-    closeAll();
-  });
-  brushSlider.addEventListener('change', () => {
-    brushPanel.classList.remove('visible');
-    closeAll();
-  });
-  brushSlider.addEventListener('change', () => {
-    brushPanel.classList.remove('visible');
-    closeAll();
-  });
-  brushSlider.addEventListener('change', () => {
-    brushPanel.classList.remove('visible');
-    closeAll();
-  });
-  brushSlider.addEventListener('change', () => {
-    brushPanel.classList.remove('visible');
-    closeAll();
-  });
+
   const brushCircle = document.createElement('div');
   brushCircle.id = 'brush-circle';
   document.body.appendChild(brushCircle);
+
   // ── Paleta ──
   const palettePopup = document.createElement('div');
   palettePopup.id = 'palette-popup';
   document.body.appendChild(palettePopup);
+
   const currentColorPreview = document.createElement('div');
   currentColorPreview.id = 'current-color-preview';
   currentColorPreview.style.background = '#ff0000';
   palettePopup.appendChild(currentColorPreview);
+
   const paletteDiv = document.createElement('div');
   paletteDiv.id = 'palette-div';
   palettePopup.appendChild(paletteDiv);
+
   currentColorPreview.addEventListener('click', e => {
     e.stopPropagation();
     paletteDiv.classList.toggle('visible');
   });
+
   const eyedropperBtn = document.createElement('button');
   eyedropperBtn.id = 'eyedropper-btn'; eyedropperBtn.innerHTML = '💉 Gotero';
   paletteDiv.appendChild(eyedropperBtn);
+
   eyedropperBtn.addEventListener('click', () => {
     const next = !eyedropperActive;
     setEyedropperActive(next);
@@ -615,6 +653,7 @@ export function buildUI({} = {}) {
     document.body.classList.toggle('eyedropper-cursor', next);
     if (next) paletteDiv.classList.remove('visible');
   });
+
   // Función helper para generar colores HSL
   const hslToHex = (h, s, l) => {
     s /= 100; l /= 100;
@@ -623,6 +662,7 @@ export function buildUI({} = {}) {
     const f = n => Math.round(255 * (l - a * Math.max(Math.min(k(n)-3, 9-k(n), 1), -1))).toString(16).padStart(2, '0');
     return `#${f(0)}${f(8)}${f(4)}`;
   };
+
   ['#000000', '#888888', '#ffffff',
     ...Array.from({ length: 97 }, (_, i) => hslToHex((i / 97) * 360, 80, 50))
   ].forEach(color => {
@@ -636,6 +676,7 @@ export function buildUI({} = {}) {
     });
     paletteDiv.appendChild(sw);
   });
+
   // ── Acciones hijos FAB ──
   fabMenu.addEventListener('click', e => {
     e.stopPropagation();
@@ -652,6 +693,7 @@ export function buildUI({} = {}) {
       fabOpen = true;
     }
   });
+
   fabBrush.addEventListener('click', e => {
     e.stopPropagation();
     const isOpen = brushPanel.classList.contains('visible');
@@ -666,6 +708,7 @@ export function buildUI({} = {}) {
       fabOpen = true;
     }
   });
+
   fabPalette.addEventListener('click', e => {
     e.stopPropagation();
     const isOpen = paletteDiv.classList.contains('visible');
@@ -676,15 +719,19 @@ export function buildUI({} = {}) {
       // 9
       ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
       document.getElementById('fab-group').style.visibility = 'hidden';
+      document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
+      document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
+      fabOpen = true;
+    }
+  });
+
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};
-  const createPad = cfg => {
-    const id = cfg.id;
-    const icon = cfg.icon;
-    const pos = cfg.pos;
-    const fontSize = cfg.fontSize || '26px';
+
+  const createPad = ({ id, icon, tip, pos, fontSize = '26px' }) => {
     const pad = document.createElement('div');
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
+    pad.setAttribute('data-tip', tip);
     pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
     const iconEl = document.createElement('span');
     iconEl.style.fontSize = fontSize;
@@ -695,15 +742,19 @@ export function buildUI({} = {}) {
     padEls[id] = pad;
     return pad;
   };
-  createPad({ id: 'orbit', icon: '↻', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
-  createPad({ id: 'pan', icon: '✥', pos: 'left:24px;bottom:112px;' });
-  createPad({ id: 'zoom', icon: '🔍', pos: 'left:24px;bottom:112px;' });
+
+  createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
+  createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'zoom', icon: '🔍', tip: 'Zoom', pos: 'left:24px;bottom:112px;' });
+
   const camStackBtn = document.createElement('div');
   camStackBtn.className = 'cam-pad cam-stack-toggle';
   camStackBtn.id = 'cam-pad-stack-toggle';
+  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
   camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
   camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
   document.body.appendChild(camStackBtn);
+
   let camStackOpen = false;
   const applyCamStack = () => {
     const pan = padEls.pan;
@@ -720,9 +771,11 @@ export function buildUI({} = {}) {
     camStackOpen = !camStackOpen;
     applyCamStack();
   });
+
   ['orbit', 'pan', 'zoom'].forEach(id => {
     const pad = padEls[id];
     let active = false, lastX = 0, lastY = 0;
+
     const startInteraction = (x, y) => {
       if (active) return;
       active = true; lastX = x; lastY = y;
@@ -749,6 +802,7 @@ export function buildUI({} = {}) {
       if (gb) gb.style.visibility = 'visible';
       if (gr) gr.style.visibility = 'visible';
     };
+
     const move = (x, y) => {
       if (!active) return;
       const dx = x - lastX, dy = y - lastY;
@@ -780,6 +834,7 @@ export function buildUI({} = {}) {
       }
       _ctrl.update();
     };
+
     pad.addEventListener('mousedown',  e => { e.stopPropagation(); startInteraction(e.clientX, e.clientY); });
     window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
     window.addEventListener('mouseup',   endInteraction);
@@ -787,6 +842,7 @@ export function buildUI({} = {}) {
     window.addEventListener('touchmove', e => { if (active) { e.preventDefault(); const t = e.touches[0]; move(t.clientX, t.clientY); } }, { passive: false });
     window.addEventListener('touchend', endInteraction);
   });
+
   // CSS joystick pads independientes
   document.head.insertAdjacentHTML('beforeend', `<style>
 /* fab-cam removed — pads are standalone */
@@ -818,11 +874,8 @@ export function buildUI({} = {}) {
 }
 #cam-pad-pan.open  { opacity:1; pointer-events:auto; transform:translateY(-88px); }
 #cam-pad-zoom.open { opacity:1; pointer-events:auto; transform:translateY(-168px); }
-@media (orientation: landscape) and (max-height: 560px) {
-  #cam-pad-pan.open  { transform:translateX(88px); }
-  #cam-pad-zoom.open { transform:translateX(168px); }
-}
 #fab-lock { display:none; }
+
 #grid-btn {
   position:fixed; top:24px; left:24px; z-index:2000;
   width:56px; height:56px; border-radius:12px;
@@ -834,11 +887,13 @@ export function buildUI({} = {}) {
 #grid-btn:hover  { background:rgba(50,50,50,0.9); color:rgba(255,255,255,0.7); }
 #grid-btn.active { background:rgba(80,180,255,0.18); border-color:rgba(80,180,255,0.5); color:#6ab0ff; }
 </style>`);
+
   // ── Botón de malla guía (superior izquierdo) ──
   const gridBtn = document.createElement('div');
   gridBtn.id = 'grid-btn'; gridBtn.title = 'Malla guía';
   gridBtn.textContent = '⊹';
   document.body.appendChild(gridBtn);
+
   let gridVisible = false;
   gridBtn.addEventListener('click', e => {
     e.stopPropagation();
