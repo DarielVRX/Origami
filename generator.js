@@ -165,12 +165,22 @@ function computeFree(ring) {
 
 // Recalcular yOffsets en cascada para rings con yOffsetAuto=true
 function recomputeYOffsets() {
+  // Empezamos desde el segundo anillo (índice 1)
   for (let i = 1; i < rings.length; i++) {
+    // Si el usuario bloqueó el offset manualmente, saltamos
     if (!rings[i].yOffsetAuto) continue;
+
     const prev = rings[i - 1];
-    rings[i].yOffset = parseFloat(
-      (prev.yOffset + prev.layers * V_STEP_BASE).toFixed(2)
-    );
+    
+    // 1. Tomamos el offset de inicio del anillo anterior.
+    // 2. Calculamos cuánto miden sus capas: (Número de capas * V_STEP_BASE).
+    // 3. Lo dividimos por su escala (a menor escala, mayor altura visual en el espacio 3D, 
+    //    o viceversa según cómo esté definido tu motor, pero siguiendo tu lógica de "inversamente proporcional").
+    
+    const heightOfPreviousRing = (prev.layers * V_STEP_BASE) / Math.max(prev.scale, 0.0001);
+    
+    // El nuevo offset es el inicio del anterior + la altura total ocupada por el anterior
+    rings[i].yOffset = parseFloat((prev.yOffset + heightOfPreviousRing).toFixed(2));
   }
 }
 // ── Cargar módulo base ──
