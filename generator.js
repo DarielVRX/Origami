@@ -26,17 +26,6 @@ const clampNumber = (v, mn, mx)      => Math.min(mx, Math.max(mn, v));
 const roundStep   = (v, step)        => Math.round(v / step) * step;
 const maxOriginOffset = (modules, arc) => Math.max(1, Math.round(modules * (arc / 360)));  // [-M*arc/360, M*arc/360]
 
-// ── Helpers de pasos discretos para arc y radius ──
-function clampArc(modules, scale, radius) {
-  const idealArc = modules * scale / (K * BASE_RADIUS * radius);
-  return roundStep(idealArc, 0.5);  // ajusta a múltiplos de 0.5°
-}
-
-function clampRadius(modules, arc, scale) {
-  const idealRadius = modules * scale / (K * BASE_RADIUS * arc);
-  return roundStep(idealRadius, 0.1); // ajusta a múltiplos de 0.1
-}
-
 function ensureFixedState(ring) {
   const keys = ['modules', 'arc', 'scale', 'radius'];
   keys.forEach(k => { if (typeof ring.fixed[k] !== 'boolean') ring.fixed[k] = true; });
@@ -154,24 +143,22 @@ function computeFree(ring) {
   const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, 20);
   const calcRadius = (modules, arc, scale) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, 20);
 
-const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
+  const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
 
-if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
-else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
-else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
-else if (ring._autoKey === 'radius') ring.radius = calcRadius(ring.modules, ring.arc, ring.scale);
+  if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
+  else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
+  else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
+  else ring.radius = calcRadius(ring.modules, ring.arc, ring.scale);
 
   const autoKeys = ['modules', 'arc', 'scale', 'radius'].filter(k => !ring.fixed[k] && k !== ring._autoKey);
   autoKeys.forEach(k => {
-    if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
-else if (ring._autoKey === 'arc') ring.arc = clampArc(ring.modules, ring.scale, ring.radius);
-else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
-else ring.radius = clampRadius(ring.modules, ring.arc, ring.scale);
+    if (k === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
+    else if (k === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
+    else if (k === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
+    else ring.radius = calcRadius(ring.modules, ring.arc, ring.scale);
   });
-  
-['modules','arc','scale','radius'].forEach(k => {
-  ring[k] = roundStep(ring[k], STEP[k] ?? 0.1);
-});
+
+  ['modules','arc','scale','radius'].forEach(k => { if (ring.fixed[k]) ring[k] = prev[k]; });
 
   ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules, ring.arc), maxOriginOffset(ring.modules, ring.arc));
 }
@@ -384,26 +371,18 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
   const btnM = document.createElement('button'); btnM.textContent = '−';
   const inp  = document.createElement('input');
   inp.type = 'number'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
-  // Mantener clase visual, pero permitir escritura
+  if (readonly) { inp.readOnly = true; inp.classList.add('computed'); }
   const btnP = document.createElement('button'); btnP.textContent = '+';
   btnM.disabled = readonly;
   btnP.disabled = readonly;
 
-const STEP = {
-  modules: 1,      // siempre múltiplos de 1
-  arc: 0.5,        // pasos de 0.5°
-  scale: 0.1,      // pasos de 0.1
-  radius: 0.1,     // pasos de 0.1
-};
-
-const apply = v => {
-  const parsed = parseFloat(v);
-  const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
-  const stepUsed = STEP[key] ?? step;   // STEP puede definirse con los pasos deseados
-  const c = clampNumber(roundStep(base, stepUsed), min, max);
-  inp.value = parseFloat(c.toFixed(10));
-  onChange(c);   // siempre llama
-};
+  const apply = v => {
+    const parsed = parseFloat(v);
+    const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
+    const c = clampNumber(roundStep(base, step), min, max);
+    inp.value = parseFloat(c.toFixed(10));
+    if (!readonly) onChange(c);
+  };
 
   let holdTimer = null;
   let holdInterval = null;
@@ -438,12 +417,7 @@ const apply = v => {
     };
   };
 
-inp.addEventListener('change', () => {
-  // Solo aquí redondeamos a los pasos válidos
-  if (key === 'arc') v = roundStep(v, 0.5);      // paso de 0.5°
-  if (key === 'radius') v = roundStep(v, 0.1);   // paso de 0.1 u
-  apply(v);
-});
+  inp.addEventListener('change', () => apply(inp.value));
   btnM.addEventListener('click', e => e.preventDefault());
   btnP.addEventListener('click', e => e.preventDefault());
   btnM.addEventListener('pointerdown', e => startHold(e, -1));
@@ -609,44 +583,33 @@ export function buildGeneratorPanel() {
         const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
 
         // Calcular límites dinámicos para el parámetro auto según los fijos
-       if (isAuto) {
-  if (key === 'modules') {
-    min = 1; max = clampNumber(Math.round(K * ring.arc * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
-  } else if (key === 'arc') {
-    min = clampArc(ring.modules, ring.scale, ring.radius);
-    max = 360;       // límite visual
-    step = 0.5;      // paso discreto
-  } else if (key === 'scale') {
-    min = 0.1; max = 20;
-  } else if (key === 'radius') {
-    min = 0.1; max = 20;
-    step = 0.1;      // paso discreto
-    ring.radius = clampRadius(ring.modules, ring.arc, ring.scale); // opcional: fuerza valor inicial válido
-  }
-}
+        if (isAuto) {
+          if (key === 'modules') {
+            min = 1; max = clampNumber(Math.round(K * ring.arc * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
+          } else if (key === 'arc') {
+            const mMax = clampNumber(Math.round(K * 360 * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
+            min = Math.max(1, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)));
+            max = Math.min(360, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)) * 2 || 360);
+            // Simplificado: recalcular los extremos reales
+            min = clampNumber(roundStep(ring.modules * Math.max(ring.scale, 0.0001) / (K * BASE_RADIUS * Math.max(ring.radius, 0.1)), 0.5), 1, 360);
+            max = 360;
+          } else if (key === 'scale') {
+            min = 0.1; max = 20;
+          } else if (key === 'radius') {
+            min = 0.1; max = 20;
+          }
+        }
 
         const ctrl = numCtrl(
           parseFloat(Number(ring[key]).toFixed(4)),
           min, max, step,
           v => {
-  let newValue = v;
-
-  // Forzar paso válido según fórmula
-  if (key === 'arc') {
-    newValue = clampArc(ring.modules, ring.scale, ring.radius);
-    newValue = clampNumber(newValue, min, max);
-  } else if (key === 'radius') {
-    newValue = clampRadius(ring.modules, ring.arc, ring.scale);
-    newValue = clampNumber(newValue, min, max);
-  }
-
-  ring[key] = newValue;
-
-  computeFree(ring);
-  if (key === 'scale' || key === 'layers') recomputeYOffsets();
-  renderPanel();
-  refreshPreviewIfActive();
-},
+            ring[key] = v;
+            computeFree(ring);
+            if (key === 'scale' || key === 'layers') recomputeYOffsets();
+            renderPanel();
+            refreshPreviewIfActive();
+          },
           isAuto
         );
         const tog = document.createElement('button');
