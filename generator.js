@@ -654,7 +654,6 @@ rings.forEach((ring, idx) => {
     row.append(lbl, tog, ctrl);
     sec.appendChild(row);
   });
-});
       const rEff = parseFloat((BASE_RADIUS * ring.scale * ring.radius).toFixed(2));
       const info = document.createElement('div'); info.className = 'gen-info';
       info.textContent = `radio efectivo: ${rEff} u`;
