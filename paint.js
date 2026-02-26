@@ -14,9 +14,22 @@ export let brushSize        = 1;
 export let eyedropperActive = false;
 export let isDrawing        = false;
 
+const lockedMeshIds = new Set();
+
 export function setCurrentColor(c)     { currentColor     = c; }
 export function setBrushSize(s)        { brushSize        = s; }
 export function setEyedropperActive(v) { eyedropperActive = v; }
+
+export function setRingLocked(ringIndex, locked) {
+  if (!glbModel) return;
+  const target = `ring:${ringIndex}`;
+  glbModel.traverse(child => {
+    if (!child.isMesh) return;
+    if (child.userData?.ringId !== target) return;
+    if (locked) lockedMeshIds.add(child.uuid);
+    else lockedMeshIds.delete(child.uuid);
+  });
+}
 
 let lastHovered = null;
 let lastClicked = null;
@@ -53,6 +66,7 @@ function paintAt(hitPoint) {
 
   glbModel.traverse(child => {
     if (!child.isMesh) return;
+    if (lockedMeshIds.has(child.uuid)) return;
 
     if (brushSize <= 1) {
       if (child !== lastHovered) return;
@@ -81,8 +95,11 @@ function updateHover(intersects) {
     lastHovered.material.emissiveIntensity = 0;
   if (!intersects.length) { lastHovered = null; return; }
 
-  const hitPoint = intersects[0].point;
-  lastHovered = intersects[0].object;
+  const unlocked = intersects.find(i => !lockedMeshIds.has(i.object.uuid));
+  if (!unlocked) { lastHovered = null; return; }
+
+  const hitPoint = unlocked.point;
+  lastHovered = unlocked.object;
 
   glbModel.traverse(child => {
     if (!child.isMesh || child === lastClicked) return;
@@ -125,8 +142,9 @@ export function initPaintEvents(brushCircleEl) {
     if (e.button !== 0 || !glbModel) return;
     const its = getIntersects(e.clientX, e.clientY);
 
-    if (its.length) {
-      const obj = its[0].object;
+    const unlockedHit = its.find(i => !lockedMeshIds.has(i.object.uuid));
+    if (unlockedHit) {
+      const obj = unlockedHit.object;
       if (eyedropperActive) {
         const picked = '#' + obj.material.color.getHexString();
         if (onColorPicked) onColorPicked(picked);
@@ -138,7 +156,7 @@ export function initPaintEvents(brushCircleEl) {
     }
 
     isDrawing = true;
-    if (its.length && !eyedropperActive) paintAt(its[0].point);
+    if (unlockedHit && !eyedropperActive) paintAt(unlockedHit.point);
   });
 
   renderer.domElement.addEventListener('mouseup', () => { isDrawing = false; });
@@ -151,7 +169,8 @@ export function initPaintEvents(brushCircleEl) {
     touchPainting = true; isDrawing = true;
     const t   = e.touches[0];
     const its = getIntersects(t.clientX, t.clientY);
-    if (its.length && !eyedropperActive) paintAt(its[0].point);
+    const unlockedHit = its.find(i => !lockedMeshIds.has(i.object.uuid));
+    if (unlockedHit && !eyedropperActive) paintAt(unlockedHit.point);
   }, { passive: true });
 
   renderer.domElement.addEventListener('touchmove', e => {
