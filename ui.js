@@ -1237,6 +1237,10 @@ export function buildUI({} = {}) {
     brushPanel.classList.remove('visible');
     closeAll();
   });
+  brushSlider.addEventListener('change', () => {
+    brushPanel.classList.remove('visible');
+    closeAll();
+  });
 
   const brushCircle = document.createElement('div');
 
@@ -1432,12 +1436,14 @@ export function buildUI({} = {}) {
       ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
       document.getElementById('fab-group').style.visibility = 'hidden';
 
-      document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
-
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};
 
-  const createPad = ({ id, icon, pos, fontSize = '26px' }) => {
+  const createPad = cfg => {
+    const id = cfg.id;
+    const icon = cfg.icon;
+    const pos = cfg.pos;
+    const fontSize = cfg.fontSize || '26px';
     const pad = document.createElement('div');
 
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
