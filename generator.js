@@ -182,6 +182,9 @@ const CSS = `
   padding:5px 8px; text-align:right; outline:none; transition:border-color 0.2s;
 }
 .num-ctrl input:focus { border-color:rgba(255,255,255,0.4); }
+.num-ctrl input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+.num-ctrl input[type=number]::-webkit-outer-spin-button,
+.num-ctrl input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .num-ctrl input.computed { border-color:rgba(80,180,255,0.4); color:rgba(80,200,255,0.9); background:rgba(80,180,255,0.06); }
 .num-ctrl button {
   width:26px; height:26px; border-radius:5px; border:1px solid rgba(255,255,255,0.12);
@@ -189,6 +192,7 @@ const CSS = `
   display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s;
 }
 .num-ctrl button:hover { background:rgba(255,255,255,0.15); }
+.num-ctrl button:disabled { opacity:0.35; cursor:not-allowed; background:rgba(255,255,255,0.03); }
 .fix-btn {
   font-family:'Courier New',monospace; font-size:10px; padding:3px 7px;
   border-radius:4px; border:1px solid rgba(255,255,255,0.15);
@@ -248,17 +252,20 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
   inp.type = 'number'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
   if (readonly) { inp.readOnly = true; inp.classList.add('computed'); }
   const btnP = document.createElement('button'); btnP.textContent = '+';
+  btnM.disabled = readonly;
+  btnP.disabled = readonly;
 
   const apply = v => {
-    const c = clampNumber(roundStep(parseFloat(v) || min, step), min, max);
+    const parsed = parseFloat(v);
+    const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
+    const c = clampNumber(roundStep(base, step), min, max);
     inp.value = parseFloat(c.toFixed(10)); // evitar drift
     if (!readonly) onChange(c);
   };
   inp.addEventListener('change', () => apply(inp.value));
-  btnM.addEventListener('click', () => apply(parseFloat(inp.value) - step));
-  btnP.addEventListener('click', () => apply(parseFloat(inp.value) + step));
+  btnM.addEventListener('click', () => { if (!readonly) apply(parseFloat(inp.value) - step); });
+  btnP.addEventListener('click', () => { if (!readonly) apply(parseFloat(inp.value) + step); });
 
-  // Para refresh externo sin disparar onChange
   inp._set = v => { inp.value = v; };
 
   wrap.append(btnM, inp, btnP);

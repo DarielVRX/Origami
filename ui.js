@@ -577,7 +577,11 @@ export function buildUI({} = {}) {
     if (fabOpen) activateExclusive('fab');
     else         activateExclusive(null);
   };
-  fabMain.addEventListener('click', e => { e.stopPropagation(); closeAll(); toggleFab(); });
+  fabMain.addEventListener('click', e => {
+    e.stopPropagation();
+    if (fabOpen) closeAll();
+    else { closeAll(); toggleFab(); }
+  });
 
   // ── Panel pincel ──
   const brushPanel = document.createElement('div');
@@ -741,10 +745,16 @@ export function buildUI({} = {}) {
     const endInteraction = () => {
       if (!active) return;
       active = false;
-      // 2.4 — restaurar todos al soltar
+      const inPreview = document.body.classList.contains('gen-preview-active');
       const fg = document.getElementById('fab-group');
       const gb = document.getElementById('gen-btn');
       const gr = document.getElementById('grid-btn');
+      if (inPreview) {
+        if (fg) fg.style.visibility = 'hidden';
+        if (gr) gr.style.visibility = 'hidden';
+        if (gb) gb.style.visibility = 'visible';
+        return;
+      }
       if (fg) fg.style.visibility = 'visible';
       if (gb) gb.style.visibility = 'visible';
       if (gr) gr.style.visibility = 'visible';
