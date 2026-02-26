@@ -566,22 +566,19 @@ export function buildGeneratorPanel() {
     const footer = document.createElement('div'); footer.id = 'gen-footer';
     panel.appendChild(footer);
 
-    rings.forEach((ring, idx) => {
+rings.forEach((ring, idx) => {
   computeFree(ring);
   
-  // Definimos la constante de control para los límites dinámicos
   const LIMIT_K = 7200;
 
   const sec = document.createElement('div'); sec.className = 'gen-section';
-  // ... (tu código de header, lockBtn y visBtn se mantiene igual)
+  // ... (tus botones de bloqueo/visibilidad se mantienen igual)
 
-  // Definición de controles con límites dinámicos
   const defs = [
     { 
       key: 'modules', 
       label: 'Módulos',  
       min: 1,  
-      // El máximo es 500 o lo que permita el producto de las otras 3 variables
       max: Math.min(500, Math.floor(LIMIT_K / (Math.max(ring.arc, 0.0001) * Math.max(ring.scale, 0.0001) * Math.max(ring.radius, 0.0001)))), 
       step: 1 
     },
@@ -613,59 +610,51 @@ export function buildGeneratorPanel() {
     const row = document.createElement('div'); row.className = 'gen-row';
     const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
 
-        // Calcular límites dinámicos para el parámetro auto según los fijos
-        if (isAuto) {
-          if (key === 'modules') {
-            min = 1; max = clampNumber(Math.round(K * ring.arc * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
-          } else if (key === 'arc') {
-            const mMax = clampNumber(Math.round(K * 360 * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
-            min = Math.max(1, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)));
-            max = Math.min(360, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)) * 2 || 360);
-            // Simplificado: recalcular los extremos reales
-            min = clampNumber(roundStep(ring.modules * Math.max(ring.scale, 0.0001) / (K * BASE_RADIUS * Math.max(ring.radius, 0.1)), 0.5), 1, 360);
-            max = 360;
-          } else if (key === 'scale') {
-            min = 0.1; max = 20;
-          } else if (key === 'radius') {
-            min = 0.1; max = 20;
-          }
-        }
+    // ELIMINADO: El bloque redundante if(isAuto) que causaba el salto a 500/1
+    // Ahora 'max' ya contiene el límite del producto calculado arriba.
 
-        const ctrl = numCtrl(
-          parseFloat(Number(ring[key]).toFixed(4)),
-          min, max, step,
-          v => {
-            ring[key] = v;
-            computeFree(ring);
-            if (key === 'scale' || key === 'layers') recomputeYOffsets();
-            renderPanel();
-            refreshPreviewIfActive();
-          },
-          isAuto
-        );
-        const tog = document.createElement('button');
-        tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
-        tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
-        tog.addEventListener('click', () => {
-          const keys = ['modules','arc','scale','radius'];
-          const fixedCount = keys.filter(k => ring.fixed[k]).length;
+    const ctrl = numCtrl(
+      parseFloat(Number(ring[key]).toFixed(4)),
+      min, 
+      max, // Usamos el max dinámico de LIMIT_K
+      step,
+      v => {
+        ring[key] = v;
+        computeFree(ring);
+        if (key === 'scale' || key === 'layers') recomputeYOffsets();
+        renderPanel();
+        refreshPreviewIfActive();
+      },
+      isAuto
+    );
 
-          if (ring.fixed[key]) {
-            if (fixedCount <= 1) return;
-            ring.fixed[key] = false;
-          } else {
-            if (fixedCount >= 3) return;
-            ring.fixed[key] = true;
-          }
+    const tog = document.createElement('button');
+    tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
+    tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
+    tog.addEventListener('click', () => {
+      const keys = ['modules','arc','scale','radius'];
+      const fixedCount = keys.filter(k => ring.fixed[k]).length;
 
-          const autoKeys = keys.filter(k => !ring.fixed[k]);
-          ring._autoKey = autoKeys.includes(ring._autoKey) ? ring._autoKey : autoKeys[0];
-          computeFree(ring); renderPanel(); refreshPreviewIfActive();
-        });
-        row.append(lbl, tog, ctrl);
-        sec.appendChild(row);
-      });
+      if (ring.fixed[key]) {
+        if (fixedCount <= 1) return;
+        ring.fixed[key] = false;
+      } else {
+        if (fixedCount >= 3) return;
+        ring.fixed[key] = true;
+      }
 
+      const autoKeys = keys.filter(k => !ring.fixed[k]);
+      ring._autoKey = autoKeys.includes(ring._autoKey) ? ring._autoKey : autoKeys[0];
+      
+      // Antes de re-computar, aseguramos que el valor actual no rompa el nuevo límite
+      computeFree(ring); 
+      renderPanel(); 
+      refreshPreviewIfActive();
+    });
+    row.append(lbl, tog, ctrl);
+    sec.appendChild(row);
+  });
+});
       const rEff = parseFloat((BASE_RADIUS * ring.scale * ring.radius).toFixed(2));
       const info = document.createElement('div'); info.className = 'gen-info';
       info.textContent = `radio efectivo: ${rEff} u`;
