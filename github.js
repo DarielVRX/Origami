@@ -70,13 +70,21 @@ export async function uploadToGitHub(arrayBuffer, filename) {
 export async function downloadFromGitHub(filename) {
   const clean = filename.trim().replace(/\.glb$/i, '');
   const path = clean + '.glb';
-  const res = await fetch(
-    `https://api.github.com/repos/${GH_REPO}/contents/${path}`,
-    { headers: { ...GH_HEADERS, 'Accept': 'application/vnd.github.raw+json' } }
-  );
+  // Usar raw.githubusercontent.com para obtener el binario directamente
+  // sin pasar por la API que devuelve JSON con base64
+  const rawUrl = `https://raw.githubusercontent.com/${GH_REPO}/${GH_BRANCH}/${path}`;
+  const res = await fetch(rawUrl);
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || `HTTP ${res.status}`);
+    // Fallback: intentar via API con Accept raw
+    const apiRes = await fetch(
+      `https://api.github.com/repos/${GH_REPO}/contents/${path}`,
+      { headers: { ...GH_HEADERS, 'Accept': 'application/vnd.github.raw' } }
+    );
+    if (!apiRes.ok) {
+      const err = await apiRes.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${apiRes.status}`);
+    }
+    return apiRes.arrayBuffer();
   }
   return res.arrayBuffer();
 }
