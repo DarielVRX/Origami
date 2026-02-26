@@ -10,8 +10,8 @@ import { setRingLocked, setRingVisible, setPaintInteractionsEnabled } from './pa
 import { setModelVisibility, glbModel } from './model.js';
 
 // ── Constantes del modelo original ──
-const K              = 20 / (360 * 17);   // módulos / (arc * BASE_RADIUS * scale * radius)
-const BASE_RADIUS    = 17;
+const K              = 7200;   // módulos / (arc * BASE_RADIUS * scale * radius)
+const BASE_RADIUS    = 1;
 const OVERLAP_BASE   = 1.4;
 const V_SPACING_BASE = 3.5;
 const V_STEP_BASE    = V_SPACING_BASE - OVERLAP_BASE; // 2.1u neto
@@ -138,13 +138,44 @@ export function setGeneratorRingsSnapshot(snapshot) {
 // Relación (escala invertida): modules = K * arc * BASE_RADIUS * (radius / scale)
 function computeFree(ring) {
   ensureFixedState(ring);
-  const calcModules = (arc, scale, radius) => clampNumber(Math.round(K * arc * BASE_RADIUS * (radius / Math.max(scale, 0.0001))), 1, 500);
-  const calcArc = (modules, scale, radius) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, 360);
-  const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, 20);
-  const calcRadius = (modules, arc, scale) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, 20);
+
+  // La constante límite es 7200 (20 * 360 * 1 * 1)
+  const LIMIT_K = 7200;
+
+  const calcModules = (arc, scale, radius) => {
+    // El máximo de módulos permitido por la restricción de las otras 3 variables
+    const maxByProduct = LIMIT_K / (Math.max(arc, 0.0001) * Math.max(scale, 0.0001) * Math.max(radius, 0.0001));
+    const limit = Math.min(500, maxByProduct);
+    return clampNumber(Math.round(K * arc * BASE_RADIUS * (radius / Math.max(scale, 0.0001))), 1, limit);
+  };
+
+  const calcArc = (modules, scale, radius) => {
+    // El máximo de arco permitido por la restricción de las otras 3 variables
+    const maxByProduct = LIMIT_K / (Math.max(modules, 1) * Math.max(scale, 0.0001) * Math.max(radius, 0.0001));
+    const limit = Math.min(360, maxByProduct);
+    return clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, limit);
+  };
+
+  const calcScale = (modules, arc, radius) => {
+    // En el caso de la escala, al ser inversamente proporcional en tu fórmula de módulos, 
+    // el límite se aplica al valor mínimo para no disparar el producto, 
+    // pero aquí lo aplicamos al tope superior de 20 definido.
+    const maxByProduct = LIMIT_K / (Math.max(modules, 1) * Math.max(arc, 0.0001) * Math.max(radius, 0.0001));
+    const limit = Math.min(20, maxByProduct);
+    return clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, limit);
+  };
+
+  const calcRadius = (modules, arc, scale) => {
+    // El máximo de radio permitido por la restricción de las otras 3 variables
+    const maxByProduct = LIMIT_K / (Math.max(modules, 1) * Math.max(arc, 0.0001) * Math.max(scale, 0.0001));
+    const limit = Math.min(20, maxByProduct);
+    return clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, limit);
+  };
 
   const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
-
+  
+  // ... resto de la lógica de asignación
+}
   if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
   else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
   else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
@@ -177,7 +208,7 @@ function recomputeYOffsets() {
 
     // El nuevo offset es:
     // El inicio del anterior + (todas sus capas + el hueco final) * tamaño del paso
-    const totalIncrement = (prev.layers + 1) * stepSizePrev;
+    const totalIncrement = (prev.layers + 0.5) * stepSizePrev;
     
     rings[i].yOffset = parseFloat((prev.yOffset + totalIncrement).toFixed(2));
   }
