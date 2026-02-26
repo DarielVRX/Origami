@@ -44,17 +44,6 @@ export function setRingVisible(ringIndex, visible) {
   });
 }
 
-export function setRingLocked(ringIndex, locked) {
-  if (!glbModel) return;
-  const target = `ring:${ringIndex}`;
-  glbModel.traverse(child => {
-    if (!child.isMesh) return;
-    if (child.userData?.ringId !== target) return;
-    if (locked) lockedMeshIds.add(child.uuid);
-    else lockedMeshIds.delete(child.uuid);
-  });
-}
-
 let lastHovered = null;
 let lastClicked = null;
 let touchPainting = false;
