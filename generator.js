@@ -573,6 +573,5 @@ async function applyGenerated() {
     setRingVisible(idx, ring.visible !== false);
     setRingLocked(idx, ring.visible === false ? true : ring.locked);
   });
-  _exitPreviewMode();
   generatedGroup = null;
 }
