@@ -51,19 +51,6 @@ body { overflow:hidden; }
   position:fixed; bottom:24px; right:24px; z-index:2000;
   display:flex; flex-direction:column; align-items:center; gap:14px;
 }
-#fab-main {
-  font-size:48px; font-weight:300; line-height:1;
-  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1), background 0.2s;
-}
-#fab-main.open { transform:rotate(45deg) scale(1.07); }
-
-#fab-children {
-  display:flex; flex-direction:column; align-items:center; gap:14px;
-  overflow:hidden; max-height:0; opacity:0;
-  transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
-}
-#fab-children.open { max-height:400px; opacity:1; }
-
 .fab[data-tip] { position:relative; }
 .fab[data-tip]::after {
   content:attr(data-tip);
@@ -479,8 +466,6 @@ export function closeAll() {
   document.getElementById('palette-popup')?.classList.remove('visible');
   document.getElementById('palette-div')?.classList.remove('visible');
   document.getElementById('cam-joystick')?.classList.remove('visible');
-  document.getElementById('fab-main')?.classList.remove('open');
-  document.getElementById('fab-children')?.classList.remove('open');
   const fg = document.getElementById('fab-group');
   if (fg) fg.style.visibility = 'visible';
   const fc = document.getElementById('fab-cam');
@@ -544,22 +529,17 @@ export function buildUI({} = {}) {
   addMenuBtn('🖼️', 'Exportar Imagen 2×2',   () => { closeAll(); askFilename('collage_2x2', doExportImage); });
   addMenuBtn('📦', 'Exportar GLB → GitHub', () => { closeAll(); askFilename('ModeloGLB', name => doExportGLB(name)); });
 
-  // ── FAB group ──
+  // ── FAB group (sin contenedor +) ──
   const fabGroup = document.createElement('div');
   fabGroup.id = 'fab-group';
   document.body.appendChild(fabGroup);
-
-  // Hijos expandibles
-  const fabChildren = document.createElement('div');
-  fabChildren.id = 'fab-children';
-  fabGroup.appendChild(fabChildren);
 
   const makeFabChild = (icon, tip) => {
     const btn = document.createElement('div');
     btn.className = 'fab';
     btn.setAttribute('data-tip', tip);
     btn.textContent = icon;
-    fabChildren.appendChild(btn);
+    fabGroup.appendChild(btn);
     return btn;
   };
   const fabMenu    = makeFabChild('☰',  'Menú');
@@ -567,20 +547,7 @@ export function buildUI({} = {}) {
   const fabPalette = makeFabChild('', 'Paleta de colores');
   fabPalette.style.cssText += '; background:#ff0000; border:3px solid rgba(255,255,255,0.4);';
 
-  // Botón + principal
-  const fabMain = document.createElement('div');
-  fabMain.id = 'fab-main'; fabMain.className = 'fab';
-  fabMain.textContent = '+';
-  fabGroup.appendChild(fabMain);
-
-  let fabOpen = false;
-  registerFabReset(() => { fabOpen = false; });
-  const toggleFab = () => {
-    fabOpen = !fabOpen;
-    fabMain.classList.toggle('open', fabOpen);
-    fabChildren.classList.toggle('open', fabOpen);
-  };
-  fabMain.addEventListener('click', e => { e.stopPropagation(); toggleFab(); });
+  registerFabReset(() => {});
 
   // ── Panel pincel ──
   const brushPanel = document.createElement('div');
@@ -666,7 +633,6 @@ export function buildUI({} = {}) {
     closeAll();
     if (!isOpen) {
       sideMenu.classList.add('open');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
     }
   });
 
@@ -676,7 +642,6 @@ export function buildUI({} = {}) {
     closeAll();
     if (!isOpen) {
       brushPanel.classList.add('visible');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
     }
   });
 
@@ -687,7 +652,6 @@ export function buildUI({} = {}) {
     if (!isOpen) {
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
-      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
       activateExclusive('fab');
     }
   });
@@ -716,8 +680,8 @@ export function buildUI({} = {}) {
 
   const MODES = [
     { id: 'orbit', icon: '🌐', tip: 'Orbitar' },
-    { id: 'pan',   icon: '↔️', tip: 'Pan' },
-    { id: 'zoom',  icon: '↕️', tip: 'Zoom' }
+    { id: 'pan',   icon: '✥', tip: 'Pan 8 direcciones' },
+    { id: 'zoom',  icon: '🔍', tip: 'Zoom' }
   ];
 
   MODES.forEach(({ id, icon, tip }) => {
