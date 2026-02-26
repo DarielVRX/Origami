@@ -6,6 +6,8 @@ import * as THREE        from 'https://unpkg.com/three@0.163.0/build/three.modul
 import { GLTFLoader }    from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene, resizeGuidePlanes } from './scene.js';
 import { activateExclusive } from './ui.js';
+import { setRingLocked, setRingVisible, setPaintInteractionsEnabled } from './paint.js';
+import { setModelVisibility } from './model.js';
 
 // ── Constantes del modelo original ──
 const K              = 20 / (360 * 17);   // módulos / (arc * BASE_RADIUS * scale * radius)
@@ -37,6 +39,8 @@ function ensureFixedState(ring) {
 const defaultRing = () => ({
   id: Date.now(),
   fixed:    { modules: false, arc: true, scale: true, radius: true },
+  locked:   false,
+  visible:  true,
   _autoKey: 'modules',
   modules:  20,
   arc:      360,
@@ -98,7 +102,7 @@ export async function generateStructure() {
   generatedGroup = new THREE.Group();
   const geometry = await getModuleGeometry();
 
-  for (const ring of rings) {
+  for (const [ringIndex, ring] of rings.entries()) {
     computeFree(ring);
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
     const effectiveRadius = BASE_RADIUS * scale * radius;
@@ -120,6 +124,8 @@ export async function generateStructure() {
         pivot.position.y = y;
 
         const mesh = new THREE.Mesh(geometry, mat.clone());
+        mesh.userData.ringId = `ring:${ringIndex}`;
+        mesh.visible = ring.visible !== false;
         mesh.scale.setScalar(scale);
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
         mesh.position.x = BASE_RADIUS * (radius - 1);
@@ -170,6 +176,9 @@ const CSS = `
   padding:5px 8px; text-align:right; outline:none; transition:border-color 0.2s;
 }
 .num-ctrl input:focus { border-color:rgba(255,255,255,0.4); }
+.num-ctrl input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+.num-ctrl input[type=number]::-webkit-outer-spin-button,
+.num-ctrl input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
 .num-ctrl input.computed { border-color:rgba(80,180,255,0.4); color:rgba(80,200,255,0.9); background:rgba(80,180,255,0.06); }
 .num-ctrl button {
   width:26px; height:26px; border-radius:5px; border:1px solid rgba(255,255,255,0.12);
@@ -177,6 +186,7 @@ const CSS = `
   display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s;
 }
 .num-ctrl button:hover { background:rgba(255,255,255,0.15); }
+.num-ctrl button:disabled { opacity:0.35; cursor:not-allowed; background:rgba(255,255,255,0.03); }
 .fix-btn {
   font-family:'Courier New',monospace; font-size:10px; padding:3px 7px;
   border-radius:4px; border:1px solid rgba(255,255,255,0.15);
@@ -213,6 +223,13 @@ const CSS = `
   border:1px solid rgba(80,180,255,0.4); background:rgba(80,180,255,0.12); color:#6ab0ff; transition:background 0.15s;
 }
 .gen-preview:hover { background:rgba(80,180,255,0.25); }
+#gen-preview-toggle {
+  position:fixed; top:24px; right:24px; z-index:2050;
+  padding:9px 16px; border-radius:8px; cursor:pointer; display:none;
+  font-family:'Courier New',monospace; font-size:12px; letter-spacing:1px; text-transform:uppercase;
+  border:1px solid rgba(80,180,255,0.4); background:rgba(80,180,255,0.12); color:#6ab0ff;
+}
+#gen-preview-toggle:hover { background:rgba(80,180,255,0.25); }
 `;
 
 // ── Helper: control numérico +/- ──
@@ -223,17 +240,43 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
   inp.type = 'number'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
   if (readonly) { inp.readOnly = true; inp.classList.add('computed'); }
   const btnP = document.createElement('button'); btnP.textContent = '+';
+  btnM.disabled = readonly;
+  btnP.disabled = readonly;
 
   const apply = v => {
-    const c = clampNumber(roundStep(parseFloat(v) || min, step), min, max);
-    inp.value = parseFloat(c.toFixed(10)); // evitar drift
+    const parsed = parseFloat(v);
+    const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
+    const c = clampNumber(roundStep(base, step), min, max);
+    inp.value = parseFloat(c.toFixed(10));
     if (!readonly) onChange(c);
   };
-  inp.addEventListener('change', () => apply(inp.value));
-  btnM.addEventListener('click', () => apply(parseFloat(inp.value) - step));
-  btnP.addEventListener('click', () => apply(parseFloat(inp.value) + step));
 
-  // Para refresh externo sin disparar onChange
+  let holdTimer = null;
+  let holdInterval = null;
+  const clearHold = () => {
+    if (holdTimer) clearTimeout(holdTimer);
+    if (holdInterval) clearInterval(holdInterval);
+    holdTimer = null; holdInterval = null;
+  };
+  const startHold = dir => {
+    if (readonly) return;
+    const tick = mult => apply((parseFloat(inp.value) || 0) + (dir * step * mult));
+    tick(1);
+    let mult = 1;
+    holdInterval = setInterval(() => tick(mult), 120);
+    holdTimer = setTimeout(() => { mult = 5; }, 3000);
+  };
+
+  inp.addEventListener('change', () => apply(inp.value));
+  btnM.addEventListener('click', e => e.preventDefault());
+  btnP.addEventListener('click', e => e.preventDefault());
+  btnM.addEventListener('pointerdown', () => startHold(-1));
+  btnP.addEventListener('pointerdown', () => startHold(1));
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => {
+    btnM.addEventListener(ev, clearHold);
+    btnP.addEventListener(ev, clearHold);
+  });
+
   inp._set = v => { inp.value = v; };
 
   wrap.append(btnM, inp, btnP);
@@ -252,6 +295,31 @@ export function buildGeneratorPanel() {
   const panel = document.createElement('div'); panel.id = 'gen-panel';
   document.body.appendChild(panel);
 
+  const previewToggle = document.createElement('button');
+  previewToggle.id = 'gen-preview-toggle';
+  previewToggle.textContent = 'Preview';
+  document.body.appendChild(previewToggle);
+
+  function enterPreviewMode() {
+    document.body.classList.add('gen-preview-active');
+    panel.classList.remove('open');
+    previewToggle.style.display = 'block';
+    setPaintInteractionsEnabled(false);
+    setModelVisibility(false);
+    activateExclusive(null);
+    const fg = document.getElementById('fab-group');
+    const gr = document.getElementById('grid-btn');
+    if (fg) fg.style.visibility = 'hidden';
+    if (gr) gr.style.visibility = 'hidden';
+  }
+
+  function exitPreviewMode() {
+    exitPreviewMode();
+    previewToggle.style.display = 'none';
+    setPaintInteractionsEnabled(true);
+    setModelVisibility(true);
+  }
+
   function renderPanel() {
     // Point 3: preserve scroll position across re-renders
     const scrollEl = panel.querySelector('#gen-scroll');
@@ -267,10 +335,11 @@ export function buildGeneratorPanel() {
     const hBtns = document.createElement('div'); hBtns.style.cssText = 'display:flex;gap:6px;align-items:center;';
     const prevBtn  = document.createElement('button'); prevBtn.className  = 'gen-preview'; prevBtn.textContent = '▶';
     const applyBtn = document.createElement('button'); applyBtn.className = 'gen-apply';   applyBtn.textContent = '✓';
-    const closeX   = document.createElement('div');
-    closeX.textContent = '✕'; closeX.style.cssText = 'color:rgba(255,255,255,0.3);cursor:pointer;font-size:18px;padding:4px 8px;margin-left:4px;';
+    const closeX   = document.createElement('button');
+    closeX.textContent = '✕';
+    closeX.style.cssText = "width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);cursor:pointer;font-size:16px;";
     closeX.addEventListener('click', closePanel);
-    prevBtn.addEventListener('click',  () => generateStructure().catch(e => alert(e.message)));
+    prevBtn.addEventListener('click',  () => generateStructure().then(enterPreviewMode).catch(e => alert(e.message)));
     applyBtn.addEventListener('click', () => applyGenerated(closePanel));
     hBtns.append(prevBtn, applyBtn, closeX);
     hdr.append(hTitle, hBtns);
@@ -288,7 +357,26 @@ export function buildGeneratorPanel() {
       const rh = document.createElement('div'); rh.className = 'ring-header';
       const rt = document.createElement('div'); rt.className = 'gen-title'; rt.style.marginBottom = '0';
       rt.textContent = `Anillo ${idx + 1}`;
-      rh.appendChild(rt);
+      const ringCtrls = document.createElement('div'); ringCtrls.style.cssText = 'display:flex;gap:6px;align-items:center;';
+      const lockBtn = document.createElement('button');
+      lockBtn.className = 'fix-btn' + (ring.locked ? ' active' : '');
+      lockBtn.textContent = ring.locked ? 'bloq' : 'pintable';
+      lockBtn.addEventListener('click', () => {
+        ring.locked = !ring.locked;
+        if (ring.visible !== false) setRingLocked(idx, ring.locked);
+        renderPanel();
+      });
+      const visBtn = document.createElement('button');
+      visBtn.className = 'fix-btn' + (ring.visible === false ? '' : ' active');
+      visBtn.textContent = ring.visible === false ? 'oculto' : 'visible';
+      visBtn.addEventListener('click', () => {
+        ring.visible = !ring.visible;
+        setRingVisible(idx, ring.visible);
+        setRingLocked(idx, ring.visible ? ring.locked : true);
+        renderPanel();
+      });
+      ringCtrls.append(lockBtn, visBtn);
+      rh.append(rt, ringCtrls);
       if (rings.length > 1) {
         const del = document.createElement('button'); del.className = 'ring-del'; del.textContent = '✕';
         del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); });
@@ -383,18 +471,36 @@ export function buildGeneratorPanel() {
     scroll.appendChild(addRing);
   }
 
-  const openPanel  = ()  => { panel.classList.add('open'); };
-  const closePanel = ()  => { panel.classList.remove('open'); disposeGeneratedGroup(); };
+  const openPanel  = ()  => {
+    exitPreviewMode();
+    panel.classList.add('open');
+    activateExclusive('gen');
+    const gb = document.getElementById('gen-btn');
+    if (gb) gb.style.visibility = 'hidden';
+  };
+  const closePanel = ()  => {
+    exitPreviewMode();
+    panel.classList.remove('open');
+    disposeGeneratedGroup();
+    activateExclusive(null);
+    const gb = document.getElementById('gen-btn');
+    if (gb) gb.style.visibility = 'visible';
+  };
+
+  previewToggle.addEventListener('click', e => {
+    e.stopPropagation();
+    if (!document.body.classList.contains('gen-preview-active')) return;
+    exitPreviewMode();
+    renderPanel();
+    openPanel();
+  });
 
   genBtn.addEventListener('click', e => {
     e.stopPropagation();
     if (panel.classList.contains('open')) closePanel();
     else {
-      openPanel(); renderPanel();
-      // 2.3 — ocultar todos los botones incluyendo gen-btn
-      activateExclusive('gen');
-      const gb = document.getElementById('gen-btn');
-      if (gb) gb.style.visibility = 'hidden';
+      renderPanel();
+      openPanel();
     }
   });
 
@@ -410,6 +516,11 @@ function applyGenerated(closeFn) {
     alert('Genera una vista previa primero.'); return;
   }
   if (_onApply) _onApply(generatedGroup);
+  rings.forEach((ring, idx) => {
+    setRingVisible(idx, ring.visible !== false);
+    setRingLocked(idx, ring.visible === false ? true : ring.locked);
+  });
+  exitPreviewMode();
   generatedGroup = null;
   closeFn();
 }
