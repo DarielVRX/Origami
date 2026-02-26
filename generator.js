@@ -451,7 +451,20 @@ export function buildGeneratorPanel() {
     setModelVisibility(true);
   }
   _exitPreviewMode = exitPreviewMode;
+  
+document.addEventListener('click', (e) => {
 
+  // Solo cuando preview esté activo
+  if (!document.body.classList.contains('gen-preview-active')) return;
+
+  // Ignorar UI
+  if (e.target.closest(
+    '#side-menu, #gen-panel, #brush-panel, .cam-pad, #fab-group, #palette-popup'
+  )) return;
+
+  showPreviewToast();
+
+});
   function renderPanel() {
     _renderGeneratorPanel = renderPanel;
     // Point 3: preserve scroll position across re-renders
