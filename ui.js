@@ -659,7 +659,40 @@ export function buildUI({} = {}) {
   const brushCircle = document.createElement('div');
   brushCircle.id = 'brush-circle';
   document.body.appendChild(brushCircle);
+  
+// ── Preview toast ──
+const previewToast = document.createElement('div');
+previewToast.id = 'preview-toast';
+previewToast.textContent = 'Vista previa activada';
+previewToast.style.cssText = `
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(80,220,120,0.15);
+  border: 1px solid rgba(80,220,120,0.4);
+  color: #6fdc9a;
+  backdrop-filter: blur(6px);
+  z-index: 5000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+`;
+document.body.appendChild(previewToast);
+  
+let previewToastTimeout = null;
 
+function showPreviewToast() {
+  previewToast.style.opacity = '1';
+
+  clearTimeout(previewToastTimeout);
+  previewToastTimeout = setTimeout(() => {
+    previewToast.style.opacity = '0';
+  }, 1200);
+}
   // ── Paleta ──
   const palettePopup = document.createElement('div');
   palettePopup.id = 'palette-popup';
