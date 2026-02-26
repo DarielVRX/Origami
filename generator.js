@@ -168,7 +168,7 @@ function recomputeYOffsets() {
   for (let i = 1; i < rings.length; i++) {
     if (!rings[i].yOffsetAuto) continue;
     const prev = rings[i - 1];
-    rings[i].yOffset = parseFloat((prev.yOffset + prev.layers * V_STEP_BASE / Math.max(prev.scale, 0.0001)).toFixed(2));
+    rings[i].yOffset = parseFloat((prev.yOffset + prev.layers / V_STEP_BASE / Math.max(prev.scale, 0.0001)).toFixed(2));
   }
 }
 
