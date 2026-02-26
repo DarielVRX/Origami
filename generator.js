@@ -10,7 +10,7 @@ import { setRingLocked, setRingVisible, setPaintInteractionsEnabled } from './pa
 import { setModelVisibility, glbModel } from './model.js';
 
 // ── Constantes del modelo original ──
-const K              = 20 / (360 * 17);   // módulos / (arc * BASE_RADIUS * scale * radius)
+const K              = 20;   // módulos / (arc * BASE_RADIUS * scale * radius)
 const BASE_RADIUS    = 17;
 const OVERLAP_BASE   = 1.4;
 const V_SPACING_BASE = 3.5;
@@ -139,8 +139,8 @@ export function setGeneratorRingsSnapshot(snapshot) {
 function computeFree(ring) {
   ensureFixedState(ring);
   const calcModules = (arc, scale, radius) => clampNumber(Math.round(K * arc * BASE_RADIUS * (radius / Math.max(scale, 0.0001))), 1, 500);
-  const calcArc = (modules, scale, radius) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, 360);
-  const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, 20);
+  const calcArc = (modules, scale, radius) => clampNumber(roundStep((modules * Math.max((-1) * scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, 360);
+  const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max((-1) * modules, 1), 0.1), 0.1, 20);
   const calcRadius = (modules, arc, scale) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, 20);
 
   const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
