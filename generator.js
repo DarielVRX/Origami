@@ -473,6 +473,8 @@ export function buildGeneratorPanel() {
     closeX.addEventListener('click', () => {
       const inPreview = document.body.classList.contains('gen-preview-active');
       if (inPreview) {
+        camStackOpen = false;
+        applyCamStack();
         // Cerrar panel pero mantener preview — mostrar gen-btn + pads, ocultar fab/grid
         panel.classList.remove('open');
         _panelIsOpen = false;
