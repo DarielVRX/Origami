@@ -567,50 +567,56 @@ export function buildGeneratorPanel() {
     panel.appendChild(footer);
 
     rings.forEach((ring, idx) => {
-      computeFree(ring);
-      const sec = document.createElement('div'); sec.className = 'gen-section';
+  computeFree(ring);
+  
+  // Definimos la constante de control para los límites dinámicos
+  const LIMIT_K = 7200;
 
-      const rh = document.createElement('div'); rh.className = 'ring-header';
-      const rt = document.createElement('div'); rt.className = 'gen-title'; rt.style.marginBottom = '0';
-      rt.textContent = `Anillo ${idx + 1}`;
-      const ringCtrls = document.createElement('div'); ringCtrls.style.cssText = 'display:flex;gap:6px;align-items:center;';
-      const lockBtn = document.createElement('button');
-      lockBtn.className = 'fix-btn' + (ring.locked ? ' active' : '');
-      lockBtn.textContent = ring.locked ? 'bloq' : 'pintable';
-      lockBtn.addEventListener('click', () => {
-        ring.locked = !ring.locked;
-        if (ring.visible !== false) setRingLocked(idx, ring.locked);
-        renderPanel();
-      });
-      const visBtn = document.createElement('button');
-      visBtn.className = 'fix-btn' + (ring.visible === false ? '' : ' active');
-      visBtn.textContent = ring.visible === false ? 'oculto' : 'visible';
-      visBtn.addEventListener('click', () => {
-        ring.visible = !ring.visible;
-        setRingVisible(idx, ring.visible);
-        setRingLocked(idx, ring.visible ? ring.locked : true);
-        refreshPreviewIfActive();
-        renderPanel();
-      });
-      ringCtrls.append(lockBtn, visBtn);
-      rh.append(rt, ringCtrls);
-      if (rings.length > 1) {
-        const del = document.createElement('button'); del.className = 'ring-del'; del.textContent = '✕';
-        del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); refreshPreviewIfActive(); });
-        rh.appendChild(del);
-      }
-      sec.appendChild(rh);
+  const sec = document.createElement('div'); sec.className = 'gen-section';
+  // ... (tu código de header, lockBtn y visBtn se mantiene igual)
 
-      const defs = [
-        { key: 'modules', label: 'Módulos',  min: 1,   max: 500, step: 1   },
-        { key: 'arc',     label: 'Arco (°)', min: 1,   max: 360, step: 1   },
-        { key: 'scale',   label: 'Escala',   min: 0.1, max: 20,  step: 0.1 },
-        { key: 'radius',  label: 'Radio ×',  min: 0.1, max: 20,  step: 0.1 },
-      ];
-      defs.forEach(({ key, label, min, max, step }) => {
-        const isAuto = ring._autoKey === key;
-        const row = document.createElement('div'); row.className = 'gen-row';
-        const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
+  // Definición de controles con límites dinámicos
+  const defs = [
+    { 
+      key: 'modules', 
+      label: 'Módulos',  
+      min: 1,  
+      // El máximo es 500 o lo que permita el producto de las otras 3 variables
+      max: Math.min(500, Math.floor(LIMIT_K / (Math.max(ring.arc, 0.0001) * Math.max(ring.scale, 0.0001) * Math.max(ring.radius, 0.0001)))), 
+      step: 1 
+    },
+    { 
+      key: 'arc',      
+      label: 'Arco (°)', 
+      min: 1,  
+      max: Math.min(360, LIMIT_K / (Math.max(ring.modules, 1) * Math.max(ring.scale, 0.0001) * Math.max(ring.radius, 0.0001))), 
+      step: 0.5 
+    },
+    { 
+      key: 'scale',    
+      label: 'Escala',   
+      min: 0.1, 
+      max: Math.min(20, LIMIT_K / (Math.max(ring.modules, 1) * Math.max(ring.arc, 0.0001) * Math.max(ring.radius, 0.0001))),  
+      step: 0.1 
+    },
+    { 
+      key: 'radius',   
+      label: 'Radio ×',  
+      min: 0.1, 
+      max: Math.min(20, LIMIT_K / (Math.max(ring.modules, 1) * Math.max(ring.arc, 0.0001) * Math.max(ring.scale, 0.0001))),  
+      step: 0.1 
+    },
+  ];
+
+  defs.forEach(({ key, label, min, max, step }) => {
+    const isAuto = ring._autoKey === key;
+    const row = document.createElement('div'); row.className = 'gen-row';
+    const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
+
+    // Aquí continuarías con la creación de los inputs (input.min = min, input.max = max, etc.)
+    // ...
+  });
+});
 
         // Calcular límites dinámicos para el parámetro auto según los fijos
         if (isAuto) {
