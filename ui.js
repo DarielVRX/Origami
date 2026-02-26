@@ -1516,6 +1516,37 @@ export function buildUI({} = {}) {
 
     const pad = padEls[id];
 
+  createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
+  createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'zoom', icon: '🔍', tip: 'Zoom', pos: 'left:24px;bottom:112px;' });
+
+  const camStackBtn = document.createElement('div');
+  camStackBtn.className = 'cam-pad cam-stack-toggle';
+  camStackBtn.id = 'cam-pad-stack-toggle';
+  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
+  camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
+  camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
+  document.body.appendChild(camStackBtn);
+
+  let camStackOpen = false;
+  const applyCamStack = () => {
+    const pan = padEls.pan;
+    const zoom = padEls.zoom;
+    if (!pan || !zoom) return;
+    pan.classList.toggle('open', camStackOpen);
+    zoom.classList.toggle('open', camStackOpen);
+    camStackBtn.classList.toggle('open', camStackOpen);
+    camStackBtn.querySelector('span').textContent = camStackOpen ? '▼' : '▲';
+  };
+  applyCamStack();
+  camStackBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    camStackOpen = !camStackOpen;
+    applyCamStack();
+  });
+
+  ['orbit', 'pan', 'zoom'].forEach(id => {
+    const pad = padEls[id];
     let active = false, lastX = 0, lastY = 0;
 
 
