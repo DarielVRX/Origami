@@ -830,7 +830,7 @@ export function buildUI({} = {}) {
         const off = _cam.position.clone().sub(tgt);
         sph.setFromVector3(off);
         sph.theta += dx * 0.03;
-        sph.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi - dy * 0.03));
+        sph.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi + dy * 0.03));
         off.setFromSpherical(sph);
         _cam.position.copy(tgt).add(off);
         _cam.lookAt(tgt);

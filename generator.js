@@ -24,23 +24,24 @@ let moduleGeom     = null;
 // ── Helpers matemáticos ──
 const clampNumber = (v, mn, mx)      => Math.min(mx, Math.max(mn, v));
 const roundStep   = (v, step)        => Math.round(v / step) * step;
-const maxOriginOffset = (modules, arc) => Math.max(0, Math.round((modules / arc) * 360));
+const maxOriginOffset = (modules, arc) => Math.max(0, Math.round((modules / arc) * 360 * 2));
 
 function ensureFixedState(ring) {
   const keys = ['modules', 'arc', 'scale', 'radius'];
-  const fixed = keys.filter(k => ring.fixed[k]);
+  keys.forEach(k => { if (typeof ring.fixed[k] !== 'boolean') ring.fixed[k] = true; });
 
-  if (fixed.length > 3) {
-    const keepAuto = ring._autoKey && keys.includes(ring._autoKey) ? ring._autoKey : 'radius';
-    keys.forEach(k => { ring.fixed[k] = k !== keepAuto; });
+  let fixedCount = keys.filter(k => ring.fixed[k]).length;
+  if (fixedCount === 0) {
+    ring.fixed.modules = true;
+    fixedCount = 1;
+  }
+  if (fixedCount >= 4) {
+    const fallbackAuto = keys.includes(ring._autoKey) ? ring._autoKey : 'radius';
+    ring.fixed[fallbackAuto] = false;
   }
 
-  if (keys.every(k => ring.fixed[k])) {
-    ring.fixed[ring._autoKey || 'radius'] = false;
-  }
-
-  const auto = keys.find(k => !ring.fixed[k]);
-  ring._autoKey = auto || 'radius';
+  const autoCandidates = keys.filter(k => !ring.fixed[k]);
+  ring._autoKey = autoCandidates.includes(ring._autoKey) ? ring._autoKey : (autoCandidates[0] || 'radius');
 }
 
 // ── Modelo de anillo ──
@@ -128,24 +129,36 @@ export function setGeneratorRingsSnapshot(snapshot) {
     yOffset: Number(src.yOffset ?? defaultRing().yOffset),
     originModule: Number(src.originModule ?? defaultRing().originModule),
   }));
-  rings.forEach(computeFree);
+  rings.forEach(r => { ensureFixedState(r); computeFree(r); });
   if (typeof _renderGeneratorPanel === 'function') _renderGeneratorPanel();
 }
 
 // ── Solver ──
-// Relación: modules = K * arc * BASE_RADIUS * scale * radius
+// Relación (escala invertida): modules = K * arc * BASE_RADIUS * (radius / scale)
 function computeFree(ring) {
   ensureFixedState(ring);
-  const { modules, arc, scale, radius, _autoKey } = ring;
-  if (_autoKey === 'modules') {
-    ring.modules = clampNumber(Math.round(K * arc * BASE_RADIUS * scale * radius), 1, 500);
-  } else if (_autoKey === 'arc') {
-    ring.arc = clampNumber(roundStep(modules / (K * BASE_RADIUS * scale * radius), 0.5), 1, 360);
-  } else if (_autoKey === 'scale') {
-    ring.scale = clampNumber(roundStep(modules / (K * arc * BASE_RADIUS * radius), 0.1), 0.1, 20);
-  } else {
-    ring.radius = clampNumber(roundStep(modules / (K * arc * BASE_RADIUS * scale), 0.1), 0.1, 20);
-  }
+  const calcModules = (arc, scale, radius) => clampNumber(Math.round(K * arc * BASE_RADIUS * (radius / Math.max(scale, 0.0001))), 1, 500);
+  const calcArc = (modules, scale, radius) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, 360);
+  const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, 20);
+  const calcRadius = (modules, arc, scale) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, 20);
+
+  const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
+
+  if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
+  else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
+  else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
+  else ring.radius = calcRadius(ring.modules, ring.arc, ring.scale);
+
+  const autoKeys = ['modules', 'arc', 'scale', 'radius'].filter(k => !ring.fixed[k] && k !== ring._autoKey);
+  autoKeys.forEach(k => {
+    if (k === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
+    else if (k === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
+    else if (k === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
+    else ring.radius = calcRadius(ring.modules, ring.arc, ring.scale);
+  });
+
+  ['modules','arc','scale','radius'].forEach(k => { if (ring.fixed[k]) ring[k] = prev[k]; });
+
   ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules, ring.arc), maxOriginOffset(ring.modules, ring.arc));
 }
 
@@ -185,12 +198,12 @@ export async function generateStructure() {
   for (const [ringIndex, ring] of rings.entries()) {
     computeFree(ring);
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
-    const effectiveRadius = BASE_RADIUS * scale * radius;
+    const scaleFactor = 1 / Math.max(scale, 0.0001);
     const angleStep       = arc / modules;
     const halfRingArc     = arc / 2;
     const halfStep        = angleStep / 2;
-    const originOffset    = -(originModule * angleStep);
-    const vStep           = V_STEP_BASE * scale;
+    const originOffset    = -(originModule * halfStep);
+    const vStep           = V_STEP_BASE * scaleFactor;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
@@ -213,7 +226,7 @@ export async function generateStructure() {
         const prevColor = paintKey ? previousColors.get(paintKey) : null;
         if (prevColor) mesh.material.color.copy(prevColor);
         mesh.visible = ring.visible !== false;
-        mesh.scale.setScalar(scale);
+        mesh.scale.setScalar(scaleFactor);
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
         mesh.position.x = BASE_RADIUS * (radius - 1);
 
@@ -531,10 +544,19 @@ export function buildGeneratorPanel() {
         tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
         tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
         tog.addEventListener('click', () => {
-          if (!ring.fixed[key]) return;
-          ring.fixed[ring._autoKey] = false;
-          ring.fixed[key] = true;
-          ring._autoKey = ['modules','arc','scale','radius'].find(k => !ring.fixed[k]) || 'radius';
+          const keys = ['modules','arc','scale','radius'];
+          const fixedCount = keys.filter(k => ring.fixed[k]).length;
+
+          if (ring.fixed[key]) {
+            if (fixedCount <= 1) return;
+            ring.fixed[key] = false;
+          } else {
+            if (fixedCount >= 3) return;
+            ring.fixed[key] = true;
+          }
+
+          const autoKeys = keys.filter(k => !ring.fixed[k]);
+          ring._autoKey = autoKeys.includes(ring._autoKey) ? ring._autoKey : autoKeys[0];
           computeFree(ring); renderPanel(); refreshPreviewIfActive();
         });
         row.append(lbl, tog, ctrl);
@@ -593,9 +615,19 @@ export function buildGeneratorPanel() {
 
   const openPanel  = ()  => {
     _panelIsOpen = true;
-    exitPreviewMode();
     panel.classList.add('open');
     activateExclusive('gen');
+    if (generatedGroup && generatedGroup.children.length) {
+      document.body.classList.add('gen-preview-active');
+      previewToggle.style.display = 'block';
+      setPaintInteractionsEnabled(false);
+      setModelVisibility(false);
+    } else {
+      document.body.classList.remove('gen-preview-active');
+      previewToggle.style.display = 'none';
+      setPaintInteractionsEnabled(true);
+      setModelVisibility(true);
+    }
     const gb = document.getElementById('gen-btn');
     if (gb) gb.style.visibility = 'hidden';
   };
@@ -612,7 +644,6 @@ export function buildGeneratorPanel() {
   previewToggle.addEventListener('click', e => {
     e.stopPropagation();
     if (!document.body.classList.contains('gen-preview-active')) return;
-    exitPreviewMode();
     renderPanel();
     openPanel();
   });
