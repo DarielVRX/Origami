@@ -19,6 +19,30 @@ const lockedMeshIds = new Set();
 export function setCurrentColor(c)     { currentColor     = c; }
 export function setBrushSize(s)        { brushSize        = s; }
 export function setEyedropperActive(v) { eyedropperActive = v; }
+export function setPaintInteractionsEnabled(v) { paintInteractionsEnabled = !!v; }
+
+export function setRingLocked(ringIndex, locked) {
+  if (!glbModel) return;
+  const target = `ring:${ringIndex}`;
+  glbModel.traverse(child => {
+    if (!child.isMesh) return;
+    if (child.userData?.ringId !== target) return;
+    if (locked) lockedMeshIds.add(child.uuid);
+    else lockedMeshIds.delete(child.uuid);
+  });
+}
+
+export function setRingVisible(ringIndex, visible) {
+  if (!glbModel) return;
+  const target = `ring:${ringIndex}`;
+  glbModel.traverse(child => {
+    if (!child.isMesh) return;
+    if (child.userData?.ringId !== target) return;
+    child.visible = visible;
+    if (visible) hiddenMeshIds.delete(child.uuid);
+    else hiddenMeshIds.add(child.uuid);
+  });
+}
 
 export function setRingLocked(ringIndex, locked) {
   if (!glbModel) return;
@@ -123,6 +147,7 @@ function updateHover(intersects) {
 export function initPaintEvents(brushCircleEl) {
   // Mouse move → actualizar cursor y hover
   renderer.domElement.addEventListener('mousemove', e => {
+    if (!paintInteractionsEnabled) return;
     const rpx = brushRadiusPx();
     const d   = Math.max(10, rpx * 2);
     brushCircleEl.style.width   = d + 'px';
@@ -138,6 +163,7 @@ export function initPaintEvents(brushCircleEl) {
   });
 
   renderer.domElement.addEventListener('mousedown', e => {
+    if (!paintInteractionsEnabled) return;
     closeAll();
     if (e.button !== 0 || !glbModel) return;
     const its = getIntersects(e.clientX, e.clientY);
@@ -164,6 +190,7 @@ export function initPaintEvents(brushCircleEl) {
 
   // Touch
   renderer.domElement.addEventListener('touchstart', e => {
+    if (!paintInteractionsEnabled) return;
     closeAll();
     if (e.touches.length !== 1 || !glbModel) return;
     touchPainting = true; isDrawing = true;
@@ -174,7 +201,7 @@ export function initPaintEvents(brushCircleEl) {
   }, { passive: true });
 
   renderer.domElement.addEventListener('touchmove', e => {
-    if (!touchPainting || e.touches.length !== 1 || !glbModel) return;
+    if (!paintInteractionsEnabled || !touchPainting || e.touches.length !== 1 || !glbModel) return;
     const t = e.touches[0];
     updateHover(getIntersects(t.clientX, t.clientY));
   }, { passive: true });

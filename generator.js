@@ -262,6 +262,23 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
     inp.value = parseFloat(c.toFixed(10)); // evitar drift
     if (!readonly) onChange(c);
   };
+
+  let holdTimer = null;
+  let holdInterval = null;
+  const clearHold = () => {
+    if (holdTimer) clearTimeout(holdTimer);
+    if (holdInterval) clearInterval(holdInterval);
+    holdTimer = null; holdInterval = null;
+  };
+  const startHold = dir => {
+    if (readonly) return;
+    const tick = mult => apply((parseFloat(inp.value) || 0) + (dir * step * mult));
+    tick(1);
+    let mult = 1;
+    holdInterval = setInterval(() => tick(mult), 120);
+    holdTimer = setTimeout(() => { mult = 5; }, 3000);
+  };
+
   inp.addEventListener('change', () => apply(inp.value));
   btnM.addEventListener('click', () => { if (!readonly) apply(parseFloat(inp.value) - step); });
   btnP.addEventListener('click', () => { if (!readonly) apply(parseFloat(inp.value) + step); });

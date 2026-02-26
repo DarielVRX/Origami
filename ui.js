@@ -452,7 +452,7 @@ export function setBottomButtonsVisible(visible) {
   const fg = document.getElementById('fab-group');
   const gb = document.getElementById('gen-btn');
   const gr = document.getElementById('grid-btn');
-  ['orbit','pan','zoom'].forEach(id => {
+  ['orbit','pan','zoom','stack-toggle'].forEach(id => {
     const p = document.getElementById(`cam-pad-${id}`);
     if (p) p.style.visibility = v;
   });
@@ -466,7 +466,7 @@ export function activateExclusive(name) {
   const fg = document.getElementById('fab-group');
   const gb = document.getElementById('gen-btn');
   const gr = document.getElementById('grid-btn');
-  ['orbit','pan','zoom'].forEach(id => {
+  ['orbit','pan','zoom','stack-toggle'].forEach(id => {
     const p = document.getElementById(`cam-pad-${id}`);
     if (p) p.style.visibility = (name === null ? 'visible' : 'hidden');
   });
@@ -672,7 +672,7 @@ export function buildUI({} = {}) {
       sideMenu.classList.add('open');
       // 9 — ocultar todo menos el contenido activo
       activateExclusive(null); // restaurar primero, luego ocultar
-      ['orbit','pan','zoom'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
+      ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
       document.getElementById('fab-group').style.visibility = 'hidden';
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
       document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
@@ -687,7 +687,7 @@ export function buildUI({} = {}) {
     if (!isOpen) {
       brushPanel.classList.add('visible');
       // 9
-      ['orbit','pan','zoom'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
+      ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
       document.getElementById('fab-group').style.visibility = 'hidden';
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
       document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
@@ -703,7 +703,7 @@ export function buildUI({} = {}) {
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
       // 9
-      ['orbit','pan','zoom'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
+      ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
       document.getElementById('fab-group').style.visibility = 'hidden';
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
       document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
@@ -711,30 +711,56 @@ export function buildUI({} = {}) {
     }
   });
 
-  // ── 3 botones joystick flotantes independientes (sin contenedor, siempre en pantalla) ──
-  const MODES = [
-    { id: 'orbit', icon: '↻', tip: 'Orbitar',  pos: 'left:24px;bottom:24px;'   },
-    { id: 'pan',   icon: '✥', tip: 'Pan',       pos: 'left:112px;bottom:24px;'  },
-    { id: 'zoom',  icon: '🔍',tip: 'Zoom',      pos: 'left:200px;bottom:24px;'  },
-  ];
-
+  // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};
 
-  MODES.forEach(({ id, icon, tip, pos }) => {
+  const createPad = ({ id, icon, tip, pos, fontSize = '26px' }) => {
     const pad = document.createElement('div');
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
     pad.setAttribute('data-tip', tip);
     pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
-    pad.innerHTML = `<span style="font-size:${id==='orbit'?'34px':'26px'};font-style:normal;">${icon}</span>`;
+    pad.innerHTML = `<span style="font-size:${fontSize};font-style:normal;">${icon}</span>`;
     document.body.appendChild(pad);
     padEls[id] = pad;
+    return pad;
+  };
 
+  createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
+  createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'zoom', icon: '🔍', tip: 'Zoom', pos: 'left:24px;bottom:112px;' });
+
+  const camStackBtn = document.createElement('div');
+  camStackBtn.className = 'cam-pad cam-stack-toggle';
+  camStackBtn.id = 'cam-pad-stack-toggle';
+  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
+  camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
+  camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
+  document.body.appendChild(camStackBtn);
+
+  let camStackOpen = false;
+  const applyCamStack = () => {
+    const pan = padEls.pan;
+    const zoom = padEls.zoom;
+    if (!pan || !zoom) return;
+    pan.classList.toggle('open', camStackOpen);
+    zoom.classList.toggle('open', camStackOpen);
+    camStackBtn.classList.toggle('open', camStackOpen);
+    camStackBtn.querySelector('span').textContent = camStackOpen ? '▼' : '▲';
+  };
+  applyCamStack();
+  camStackBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    camStackOpen = !camStackOpen;
+    applyCamStack();
+  });
+
+  ['orbit', 'pan', 'zoom'].forEach(id => {
+    const pad = padEls[id];
     let active = false, lastX = 0, lastY = 0;
 
     const startInteraction = (x, y) => {
       if (active) return;
       active = true; lastX = x; lastY = y;
-      // 2.1 — al mantener presionado, ocultar fab-group y gen-btn
       const fg = document.getElementById('fab-group');
       const gb = document.getElementById('gen-btn');
       const gr = document.getElementById('grid-btn');
@@ -786,7 +812,6 @@ export function buildUI({} = {}) {
       } else {
         const dir = _cam.position.clone().sub(_ctrl.target).normalize();
         const dist = _cam.position.distanceTo(_ctrl.target);
-        // punto 7 — sin límite superior
         const nd  = Math.max(1, dist + dy * 0.5);
         _cam.position.copy(_ctrl.target).addScaledVector(dir, nd);
       }
@@ -825,6 +850,13 @@ export function buildUI({} = {}) {
   border:1px solid rgba(255,255,255,0.1);
 }
 .cam-pad[data-tip]:hover::after { opacity:1; }
+.cam-stack-toggle { width:54px; height:54px; font-size:18px; }
+#cam-pad-pan, #cam-pad-zoom {
+  width:66px; height:66px; opacity:0; pointer-events:none;
+  transition:transform 0.22s ease, opacity 0.22s ease;
+}
+#cam-pad-pan.open  { opacity:1; pointer-events:auto; transform:translateY(-88px); }
+#cam-pad-zoom.open { opacity:1; pointer-events:auto; transform:translateY(-168px); }
 #fab-lock { display:none; }
 
 #grid-btn {

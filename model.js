@@ -149,10 +149,7 @@ export function adoptGeneratedGroup(group) {
     uuidToMesh.set(child.uuid, child);
   });
 
-  const center = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3());
-  controls.target.copy(center);
   controls.update();
-  resetCamera();
   resizeGuidePlanes(group);
   onLoadCallbacks.forEach(cb => cb(group));
 }
