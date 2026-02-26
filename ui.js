@@ -1217,6 +1217,10 @@ export function buildUI({} = {}) {
     brushPanel.classList.remove('visible');
     closeAll();
   });
+  brushSlider.addEventListener('change', () => {
+    brushPanel.classList.remove('visible');
+    closeAll();
+  });
 
   const brushCircle = document.createElement('div');
 
@@ -1418,8 +1422,6 @@ export function buildUI({} = {}) {
 
       fabOpen = true;
 
-    }
-
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};
 
@@ -1427,9 +1429,6 @@ export function buildUI({} = {}) {
     const pad = document.createElement('div');
 
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
-
-    pad.setAttribute('data-tip', tip);
-
     pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
     const iconEl = document.createElement('span');
     iconEl.style.fontSize = fontSize;
@@ -1449,7 +1448,6 @@ export function buildUI({} = {}) {
   const camStackBtn = document.createElement('div');
   camStackBtn.className = 'cam-pad cam-stack-toggle';
   camStackBtn.id = 'cam-pad-stack-toggle';
-  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
   camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
   camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
   document.body.appendChild(camStackBtn);
