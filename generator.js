@@ -177,7 +177,7 @@ function recomputeYOffsets() {
 
     // El nuevo offset es:
     // El inicio del anterior + (todas sus capas + el hueco final) * tamaño del paso
-    const totalIncrement = (prev.layers + 1) * stepSizePrev;
+    const totalIncrement = (prev.layers + 0.5) * stepSizePrev;
     
     rings[i].yOffset = parseFloat((prev.yOffset + totalIncrement).toFixed(2));
   }
