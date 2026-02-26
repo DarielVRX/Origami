@@ -51,6 +51,19 @@ body { overflow:hidden; }
   position:fixed; bottom:24px; right:24px; z-index:2000;
   display:flex; flex-direction:column; align-items:center; gap:14px;
 }
+#fab-main {
+  font-size:48px; font-weight:300; line-height:1;
+  transition:transform 0.3s cubic-bezier(0.4,0,0.2,1), background 0.2s;
+}
+#fab-main.open { transform:rotate(45deg) scale(1.07); }
+
+#fab-children {
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  overflow:hidden; max-height:0; opacity:0;
+  transition:max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+}
+#fab-children.open { max-height:400px; opacity:1; }
+
 .fab[data-tip] { position:relative; }
 .fab[data-tip]::after {
   content:attr(data-tip);
@@ -450,10 +463,13 @@ export function activateExclusive(name) {
   const fg = document.getElementById('fab-group');
   const fc = document.getElementById('fab-cam');
   const gb = document.getElementById('gen-btn');
-  const jk = document.getElementById('cam-joystick');
-  // Contraer joystick si no es el activo
-  if (name !== 'joystick' && jk) jk.classList.remove('visible');
-  // Visibilidad de cada botón
+  // Ocultar pads si no es joystick activo
+  if (name !== 'joystick') {
+    ['orbit','pan','zoom'].forEach(id => {
+      const p = document.getElementById(`cam-pad-${id}`);
+      if (p) p.style.display = 'none';
+    });
+  }
   if (fg) fg.style.visibility = (name === 'fab'      ? 'visible' : 'hidden');
   if (fc) fc.style.visibility = (name === 'joystick' ? 'visible' : 'hidden');
   if (gb) gb.style.visibility = (name === 'gen'      ? 'visible' : 'hidden');
@@ -465,7 +481,13 @@ export function closeAll() {
   document.getElementById('brush-panel')?.classList.remove('visible');
   document.getElementById('palette-popup')?.classList.remove('visible');
   document.getElementById('palette-div')?.classList.remove('visible');
-  document.getElementById('cam-joystick')?.classList.remove('visible');
+  // Ocultar pads independientes
+  ['orbit','pan','zoom'].forEach(id => {
+    const p = document.getElementById(`cam-pad-${id}`);
+    if (p) p.style.display = 'none';
+  });
+  document.getElementById('fab-main')?.classList.remove('open');
+  document.getElementById('fab-children')?.classList.remove('open');
   const fg = document.getElementById('fab-group');
   if (fg) fg.style.visibility = 'visible';
   const fc = document.getElementById('fab-cam');
@@ -529,17 +551,22 @@ export function buildUI({} = {}) {
   addMenuBtn('🖼️', 'Exportar Imagen 2×2',   () => { closeAll(); askFilename('collage_2x2', doExportImage); });
   addMenuBtn('📦', 'Exportar GLB → GitHub', () => { closeAll(); askFilename('ModeloGLB', name => doExportGLB(name)); });
 
-  // ── FAB group (sin contenedor +) ──
+  // ── FAB group ──
   const fabGroup = document.createElement('div');
   fabGroup.id = 'fab-group';
   document.body.appendChild(fabGroup);
+
+  // Hijos expandibles
+  const fabChildren = document.createElement('div');
+  fabChildren.id = 'fab-children';
+  fabGroup.appendChild(fabChildren);
 
   const makeFabChild = (icon, tip) => {
     const btn = document.createElement('div');
     btn.className = 'fab';
     btn.setAttribute('data-tip', tip);
     btn.textContent = icon;
-    fabGroup.appendChild(btn);
+    fabChildren.appendChild(btn);
     return btn;
   };
   const fabMenu    = makeFabChild('☰',  'Menú');
@@ -547,7 +574,20 @@ export function buildUI({} = {}) {
   const fabPalette = makeFabChild('', 'Paleta de colores');
   fabPalette.style.cssText += '; background:#ff0000; border:3px solid rgba(255,255,255,0.4);';
 
-  registerFabReset(() => {});
+  // Botón + principal
+  const fabMain = document.createElement('div');
+  fabMain.id = 'fab-main'; fabMain.className = 'fab';
+  fabMain.textContent = '+';
+  fabGroup.appendChild(fabMain);
+
+  let fabOpen = false;
+  registerFabReset(() => { fabOpen = false; });
+  const toggleFab = () => {
+    fabOpen = !fabOpen;
+    fabMain.classList.toggle('open', fabOpen);
+    fabChildren.classList.toggle('open', fabOpen);
+  };
+  fabMain.addEventListener('click', e => { e.stopPropagation(); toggleFab(); });
 
   // ── Panel pincel ──
   const brushPanel = document.createElement('div');
@@ -633,6 +673,7 @@ export function buildUI({} = {}) {
     closeAll();
     if (!isOpen) {
       sideMenu.classList.add('open');
+      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
     }
   });
 
@@ -642,6 +683,7 @@ export function buildUI({} = {}) {
     closeAll();
     if (!isOpen) {
       brushPanel.classList.add('visible');
+      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
     }
   });
 
@@ -652,76 +694,64 @@ export function buildUI({} = {}) {
     if (!isOpen) {
       palettePopup.classList.add('visible');
       paletteDiv.classList.add('visible');
+      fabOpen = true; fabMain.classList.add('open'); fabChildren.classList.add('open');
       activateExclusive('fab');
     }
   });
 
-  // ── Botón joystick independiente (inferior izquierdo, siempre visible) ──
+  // ── 3 botones joystick independientes (inferior izquierdo) ──
   const fabCam = document.createElement('div');
   fabCam.id = 'fab-cam'; fabCam.className = 'fab';
-  fabCam.setAttribute('data-tip', 'Cámara');
-  fabCam.textContent = '🕹️';
+  fabCam.setAttribute('data-tip', 'Cámara'); fabCam.textContent = '🕹️';
   document.body.appendChild(fabCam);
 
-  fabCam.addEventListener('click', e => {
-    e.stopPropagation();
-    const isOpen = document.getElementById('cam-joystick')?.classList.contains('visible');
-    closeAll();
-    if (!isOpen) {
-      camJoystick.classList.add('visible');
-      activateExclusive('joystick');
-    }
-  });
-
-  // ── Joystick de cámara ──
-  const camJoystick = document.createElement('div');
-  camJoystick.id = 'cam-joystick';
-  document.body.appendChild(camJoystick);
-
   const MODES = [
-    { id: 'orbit', icon: '🌐', tip: 'Orbitar' },
-    { id: 'pan',   icon: '✥', tip: 'Pan 8 direcciones' },
-    { id: 'zoom',  icon: '🔍', tip: 'Zoom' }
+    { id: 'orbit', icon: '🌐', tip: 'Orbitar',  pos: 'left:24px;bottom:130px;'  },
+    { id: 'pan',   icon: '✥',  tip: 'Pan',      pos: 'left:112px;bottom:130px;' },
+    { id: 'zoom',  icon: '🔍', tip: 'Zoom',     pos: 'left:200px;bottom:130px;' },
   ];
 
-  MODES.forEach(({ id, icon, tip }) => {
+  const padEls = {};
+
+  MODES.forEach(({ id, icon, tip, pos }) => {
     const pad = document.createElement('div');
-    pad.className = 'cam-pad'; pad.dataset.mode = id;
+    pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
     pad.setAttribute('data-tip', tip);
     pad.innerHTML = `<span>${icon}</span>`;
-    camJoystick.appendChild(pad);
+    pad.style.cssText = `position:fixed;${pos}z-index:2000;display:none;`;
+    document.body.appendChild(pad);
+    padEls[id] = pad;
 
-    let active = false;
-    let lastX = 0, lastY = 0;
-
+    let active = false, lastX = 0, lastY = 0;
     const start = (x, y) => { active = true; lastX = x; lastY = y; };
     const move  = (x, y) => {
       if (!active) return;
       const dx = x - lastX, dy = y - lastY;
       lastX = x; lastY = y;
-      const sensitivity = 0.3;
       if (id === 'orbit') {
-        const spherical = new THREE.Spherical();
-        const target = _ctrl.target.clone();
-        const offset = _cam.position.clone().sub(target);
-        spherical.setFromVector3(offset);
-        spherical.theta -= dx * 0.01 * sensitivity * 10;
-        spherical.phi   += dy * 0.01 * sensitivity * 10;
-        spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi));
-        offset.setFromSpherical(spherical);
-        _cam.position.copy(target).add(offset);
-        _cam.lookAt(target);
+        const sph = new THREE.Spherical();
+        const tgt = _ctrl.target.clone();
+        const off = _cam.position.clone().sub(tgt);
+        sph.setFromVector3(off);
+        sph.theta -= dx * 0.03;
+        sph.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi + dy * 0.03));
+        off.setFromSpherical(sph);
+        _cam.position.copy(tgt).add(off);
+        _cam.lookAt(tgt);
       } else if (id === 'pan') {
-        const panSpeed = 0.05;
-        const right = new THREE.Vector3();
-        right.crossVectors(_cam.getWorldDirection(new THREE.Vector3()), _cam.up).normalize();
-        _cam.position.addScaledVector(right, -dx * panSpeed);
-        _ctrl.target.addScaledVector(right, -dx * panSpeed);
-      } else if (id === 'zoom') {
-        const dir = _cam.position.clone().sub(_ctrl.target).normalize();
+        const fwd   = _cam.getWorldDirection(new THREE.Vector3());
+        const right = new THREE.Vector3().crossVectors(fwd, _cam.up).normalize();
+        const up    = new THREE.Vector3().crossVectors(right, fwd).normalize();
+        const spd   = 0.08;
+        _cam.position.addScaledVector(right, -dx * spd);
+        _cam.position.addScaledVector(up,     dy * spd);
+        _ctrl.target.addScaledVector(right,  -dx * spd);
+        _ctrl.target.addScaledVector(up,      dy * spd);
+      } else {
+        const dir  = _cam.position.clone().sub(_ctrl.target).normalize();
         const dist = _cam.position.distanceTo(_ctrl.target);
-        const newDist = Math.max(5, Math.min(300, dist + dy * 0.5));
-        _cam.position.copy(_ctrl.target).addScaledVector(dir, newDist);
+        const nd   = Math.max(5, Math.min(300, dist + dy * 0.5));
+        _cam.position.copy(_ctrl.target).addScaledVector(dir, nd);
       }
       _ctrl.update();
     };
@@ -730,29 +760,31 @@ export function buildUI({} = {}) {
     pad.addEventListener('mousedown',  e => { e.stopPropagation(); start(e.clientX, e.clientY); });
     window.addEventListener('mousemove', e => move(e.clientX, e.clientY));
     window.addEventListener('mouseup',   end);
-
     pad.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); const t = e.touches[0]; start(t.clientX, t.clientY); }, { passive: false });
     window.addEventListener('touchmove', e => { if (active) { e.preventDefault(); const t = e.touches[0]; move(t.clientX, t.clientY); } }, { passive: false });
     window.addEventListener('touchend', end);
   });
 
-  // CSS joystick (inyectado aquí para mantenerlo junto al código)
+  // Mostrar/ocultar los 3 pads
+  const setPadsVisible = v => Object.values(padEls).forEach(p => { p.style.display = v ? 'flex' : 'none'; });
+
+  fabCam.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = padEls.orbit.style.display === 'flex';
+    closeAll();
+    if (!isOpen) { setPadsVisible(true); activateExclusive('joystick'); }
+  });
+
+  // CSS joystick pads independientes
   document.head.insertAdjacentHTML('beforeend', `<style>
-#cam-joystick {
-  position:fixed; left:24px; bottom:130px; z-index:2000;
-  display:none; flex-direction:row; gap:12px;
-}
-#cam-joystick.visible { display:flex; }
-#fab-cam {
-  position:fixed; left:24px; bottom:24px; z-index:2000;
-}
+#fab-cam { position:fixed; left:24px; bottom:24px; z-index:2000; }
 .cam-pad {
-  width:88px; height:88px; border-radius:50%;
+  width:80px; height:80px; border-radius:50%;
   background:rgba(20,20,20,0.88); border:1px solid rgba(255,255,255,0.18);
   backdrop-filter:blur(10px); display:flex; flex-direction:column;
   align-items:center; justify-content:center;
   cursor:pointer; user-select:none; touch-action:none;
-  font-size:28px; color:#fff; position:relative;
+  font-size:26px; color:#fff; position:fixed;
   transition:background 0.15s;
 }
 .cam-pad:hover  { background:rgba(60,60,60,0.95); }
@@ -767,8 +799,6 @@ export function buildUI({} = {}) {
   border:1px solid rgba(255,255,255,0.1);
 }
 .cam-pad[data-tip]:hover::after { opacity:1; }
-
-/* Lock animations ya no necesarias pero se conservan por si acaso */
 #fab-lock { display:none; }
 
 #grid-btn {
