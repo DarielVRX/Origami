@@ -796,14 +796,21 @@ export function buildUI({} = {}) {
 
   let camStackOpen = false;
   const applyCamStack = () => {
-    const pan = padEls.pan;
-    const zoom = padEls.zoom;
-    if (!pan || !zoom) return;
-    pan.classList.toggle('open', camStackOpen);
-    zoom.classList.toggle('open', camStackOpen);
-    camStackBtn.classList.toggle('open', camStackOpen);
-    camStackBtn.querySelector('span').textContent = camStackOpen ? '▼' : '▲';
-  };
+  const pan = padEls.pan;
+  const zoom = padEls.zoom;
+  if (!pan || !zoom) return;
+
+  // estado visual botón
+  camStackBtn.classList.toggle('open', camStackOpen);
+  camStackBtn.querySelector('span').textContent = camStackOpen ? '▼' : '▲';
+
+  // 🔥 CONTROL REAL DE VISIBILIDAD
+  pan.style.visibility  = camStackOpen ? 'visible' : 'hidden';
+  zoom.style.visibility = camStackOpen ? 'visible' : 'hidden';
+
+  pan.classList.toggle('open', camStackOpen);
+  zoom.classList.toggle('open', camStackOpen);
+};
   applyCamStack();
   camStackBtn.addEventListener('click', e => {
     e.stopPropagation();
