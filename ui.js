@@ -951,10 +951,8 @@ export function buildUI({} = {}) {
   let palettePreviewTimeout = null;
 const showPalettePreview = (color) => {
 
-  // ⚠️ NO tocar fab-group
-  // ⚠️ NO tocar otros botones
+  palettePopup.style.display = 'flex';
 
-  palettePopup.classList.add('visible');
   paletteDiv.classList.remove('visible');
 
   currentColorPreview.style.background = color;
