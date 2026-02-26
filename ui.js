@@ -1440,7 +1440,11 @@ export function buildUI({} = {}) {
 
     pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
 
-    pad.innerHTML = `<span style="font-size:${fontSize};font-style:normal;">${icon}</span>`;
+    const iconEl = document.createElement('span');
+    iconEl.style.fontSize = fontSize;
+    iconEl.style.fontStyle = 'normal';
+    iconEl.textContent = icon;
+    pad.appendChild(iconEl);
 
     document.body.appendChild(pad);
 
