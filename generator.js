@@ -10,8 +10,8 @@ import { setRingLocked, setRingVisible, setPaintInteractionsEnabled } from './pa
 import { setModelVisibility, glbModel } from './model.js';
 
 // ── Constantes del modelo original ──
-const K              = 7200;   // módulos / (arc * BASE_RADIUS * scale * radius)
-const BASE_RADIUS    = 1;
+const K              = 20 / (360 * 17);   // módulos / (arc * BASE_RADIUS * scale * radius)
+const BASE_RADIUS    = 17;
 const OVERLAP_BASE   = 1.4;
 const V_SPACING_BASE = 3.5;
 const V_STEP_BASE    = V_SPACING_BASE - OVERLAP_BASE; // 2.1u neto
@@ -138,43 +138,13 @@ export function setGeneratorRingsSnapshot(snapshot) {
 // Relación (escala invertida): modules = K * arc * BASE_RADIUS * (radius / scale)
 function computeFree(ring) {
   ensureFixedState(ring);
-
-  // La constante límite es 7200 (20 * 360 * 1 * 1)
-  const LIMIT_K = 7200;
-
-  const calcModules = (arc, scale, radius) => {
-    // El máximo de módulos permitido por la restricción de las otras 3 variables
-    const maxByProduct = LIMIT_K / (Math.max(arc, 0.0001) * Math.max(scale, 0.0001) * Math.max(radius, 0.0001));
-    const limit = Math.min(500, maxByProduct);
-    return clampNumber(Math.round(K * arc * BASE_RADIUS * (radius / Math.max(scale, 0.0001))), 1, limit);
-  };
-
-  const calcArc = (modules, scale, radius) => {
-    // El máximo de arco permitido por la restricción de las otras 3 variables
-    const maxByProduct = LIMIT_K / (Math.max(modules, 1) * Math.max(scale, 0.0001) * Math.max(radius, 0.0001));
-    const limit = Math.min(360, maxByProduct);
-    return clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, limit);
-  };
-
-  const calcScale = (modules, arc, radius) => {
-    // En el caso de la escala, al ser inversamente proporcional en tu fórmula de módulos, 
-    // el límite se aplica al valor mínimo para no disparar el producto, 
-    // pero aquí lo aplicamos al tope superior de 20 definido.
-    const maxByProduct = LIMIT_K / (Math.max(modules, 1) * Math.max(arc, 0.0001) * Math.max(radius, 0.0001));
-    const limit = Math.min(20, maxByProduct);
-    return clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, limit);
-  };
-
-  const calcRadius = (modules, arc, scale) => {
-    // El máximo de radio permitido por la restricción de las otras 3 variables
-    const maxByProduct = LIMIT_K / (Math.max(modules, 1) * Math.max(arc, 0.0001) * Math.max(scale, 0.0001));
-    const limit = Math.min(20, maxByProduct);
-    return clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, limit);
-  };
+  const calcModules = (arc, scale, radius) => clampNumber(Math.round(K * arc * BASE_RADIUS * (radius / Math.max(scale, 0.0001))), 1, 500);
+  const calcArc = (modules, scale, radius) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * BASE_RADIUS * radius), 0.5), 1, 360);
+  const calcScale = (modules, arc, radius) => clampNumber(roundStep((K * arc * BASE_RADIUS * radius) / Math.max(modules, 1), 0.1), 0.1, 20);
+  const calcRadius = (modules, arc, scale) => clampNumber(roundStep((modules * Math.max(scale, 0.0001)) / (K * arc * BASE_RADIUS), 0.1), 0.1, 20);
 
   const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
-  
-  // ... resto de la lógica de asignación
+
   if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
   else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
   else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
@@ -207,7 +177,7 @@ function recomputeYOffsets() {
 
     // El nuevo offset es:
     // El inicio del anterior + (todas sus capas + el hueco final) * tamaño del paso
-    const totalIncrement = (prev.layers + 0.5) * stepSizePrev;
+    const totalIncrement = (prev.layers + 1) * stepSizePrev;
     
     rings[i].yOffset = parseFloat((prev.yOffset + totalIncrement).toFixed(2));
   }
@@ -566,94 +536,105 @@ export function buildGeneratorPanel() {
     const footer = document.createElement('div'); footer.id = 'gen-footer';
     panel.appendChild(footer);
 
-rings.forEach((ring, idx) => {
-  computeFree(ring);
-  
-  const LIMIT_K = 7200;
+    rings.forEach((ring, idx) => {
+      computeFree(ring);
+      const sec = document.createElement('div'); sec.className = 'gen-section';
 
-  const sec = document.createElement('div'); sec.className = 'gen-section';
-  // ... (tus botones de bloqueo/visibilidad se mantienen igual)
-
-  const defs = [
-    { 
-      key: 'modules', 
-      label: 'Módulos',  
-      min: 1,  
-      max: Math.min(500, Math.floor(LIMIT_K / (Math.max(ring.arc, 0.0001) * Math.max(ring.scale, 0.0001) * Math.max(ring.radius, 0.0001)))), 
-      step: 1 
-    },
-    { 
-      key: 'arc',      
-      label: 'Arco (°)', 
-      min: 1,  
-      max: Math.min(360, LIMIT_K / (Math.max(ring.modules, 1) * Math.max(ring.scale, 0.0001) * Math.max(ring.radius, 0.0001))), 
-      step: 0.5 
-    },
-    { 
-      key: 'scale',    
-      label: 'Escala',   
-      min: 0.1, 
-      max: Math.min(20, LIMIT_K / (Math.max(ring.modules, 1) * Math.max(ring.arc, 0.0001) * Math.max(ring.radius, 0.0001))),  
-      step: 0.1 
-    },
-    { 
-      key: 'radius',   
-      label: 'Radio ×',  
-      min: 0.1, 
-      max: Math.min(20, LIMIT_K / (Math.max(ring.modules, 1) * Math.max(ring.arc, 0.0001) * Math.max(ring.scale, 0.0001))),  
-      step: 0.1 
-    },
-  ];
-
-  defs.forEach(({ key, label, min, max, step }) => {
-    const isAuto = ring._autoKey === key;
-    const row = document.createElement('div'); row.className = 'gen-row';
-    const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
-
-    // ELIMINADO: El bloque redundante if(isAuto) que causaba el salto a 500/1
-    // Ahora 'max' ya contiene el límite del producto calculado arriba.
-
-    const ctrl = numCtrl(
-      parseFloat(Number(ring[key]).toFixed(4)),
-      min, 
-      max, // Usamos el max dinámico de LIMIT_K
-      step,
-      v => {
-        ring[key] = v;
-        computeFree(ring);
-        if (key === 'scale' || key === 'layers') recomputeYOffsets();
+      const rh = document.createElement('div'); rh.className = 'ring-header';
+      const rt = document.createElement('div'); rt.className = 'gen-title'; rt.style.marginBottom = '0';
+      rt.textContent = `Anillo ${idx + 1}`;
+      const ringCtrls = document.createElement('div'); ringCtrls.style.cssText = 'display:flex;gap:6px;align-items:center;';
+      const lockBtn = document.createElement('button');
+      lockBtn.className = 'fix-btn' + (ring.locked ? ' active' : '');
+      lockBtn.textContent = ring.locked ? 'bloq' : 'pintable';
+      lockBtn.addEventListener('click', () => {
+        ring.locked = !ring.locked;
+        if (ring.visible !== false) setRingLocked(idx, ring.locked);
         renderPanel();
+      });
+      const visBtn = document.createElement('button');
+      visBtn.className = 'fix-btn' + (ring.visible === false ? '' : ' active');
+      visBtn.textContent = ring.visible === false ? 'oculto' : 'visible';
+      visBtn.addEventListener('click', () => {
+        ring.visible = !ring.visible;
+        setRingVisible(idx, ring.visible);
+        setRingLocked(idx, ring.visible ? ring.locked : true);
         refreshPreviewIfActive();
-      },
-      isAuto
-    );
-
-    const tog = document.createElement('button');
-    tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
-    tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
-    tog.addEventListener('click', () => {
-      const keys = ['modules','arc','scale','radius'];
-      const fixedCount = keys.filter(k => ring.fixed[k]).length;
-
-      if (ring.fixed[key]) {
-        if (fixedCount <= 1) return;
-        ring.fixed[key] = false;
-      } else {
-        if (fixedCount >= 3) return;
-        ring.fixed[key] = true;
+        renderPanel();
+      });
+      ringCtrls.append(lockBtn, visBtn);
+      rh.append(rt, ringCtrls);
+      if (rings.length > 1) {
+        const del = document.createElement('button'); del.className = 'ring-del'; del.textContent = '✕';
+        del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); refreshPreviewIfActive(); });
+        rh.appendChild(del);
       }
+      sec.appendChild(rh);
 
-      const autoKeys = keys.filter(k => !ring.fixed[k]);
-      ring._autoKey = autoKeys.includes(ring._autoKey) ? ring._autoKey : autoKeys[0];
-      
-      // Antes de re-computar, aseguramos que el valor actual no rompa el nuevo límite
-      computeFree(ring); 
-      renderPanel(); 
-      refreshPreviewIfActive();
-    });
-    row.append(lbl, tog, ctrl);
-    sec.appendChild(row);
-  });
+      const defs = [
+        { key: 'modules', label: 'Módulos',  min: 1,   max: 500, step: 1   },
+        { key: 'arc',     label: 'Arco (°)', min: 1,   max: 360, step: 1   },
+        { key: 'scale',   label: 'Escala',   min: 0.1, max: 20,  step: 0.1 },
+        { key: 'radius',  label: 'Radio ×',  min: 0.1, max: 20,  step: 0.1 },
+      ];
+      defs.forEach(({ key, label, min, max, step }) => {
+        const isAuto = ring._autoKey === key;
+        const row = document.createElement('div'); row.className = 'gen-row';
+        const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
+
+        // Calcular límites dinámicos para el parámetro auto según los fijos
+        if (isAuto) {
+          if (key === 'modules') {
+            min = 1; max = clampNumber(Math.round(K * ring.arc * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
+          } else if (key === 'arc') {
+            const mMax = clampNumber(Math.round(K * 360 * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
+            min = Math.max(1, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)));
+            max = Math.min(360, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)) * 2 || 360);
+            // Simplificado: recalcular los extremos reales
+            min = clampNumber(roundStep(ring.modules * Math.max(ring.scale, 0.0001) / (K * BASE_RADIUS * Math.max(ring.radius, 0.1)), 0.5), 1, 360);
+            max = 360;
+          } else if (key === 'scale') {
+            min = 0.1; max = 20;
+          } else if (key === 'radius') {
+            min = 0.1; max = 20;
+          }
+        }
+
+        const ctrl = numCtrl(
+          parseFloat(Number(ring[key]).toFixed(4)),
+          min, max, step,
+          v => {
+            ring[key] = v;
+            computeFree(ring);
+            if (key === 'scale' || key === 'layers') recomputeYOffsets();
+            renderPanel();
+            refreshPreviewIfActive();
+          },
+          isAuto
+        );
+        const tog = document.createElement('button');
+        tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
+        tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
+        tog.addEventListener('click', () => {
+          const keys = ['modules','arc','scale','radius'];
+          const fixedCount = keys.filter(k => ring.fixed[k]).length;
+
+          if (ring.fixed[key]) {
+            if (fixedCount <= 1) return;
+            ring.fixed[key] = false;
+          } else {
+            if (fixedCount >= 3) return;
+            ring.fixed[key] = true;
+          }
+
+          const autoKeys = keys.filter(k => !ring.fixed[k]);
+          ring._autoKey = autoKeys.includes(ring._autoKey) ? ring._autoKey : autoKeys[0];
+          computeFree(ring); renderPanel(); refreshPreviewIfActive();
+        });
+        row.append(lbl, tog, ctrl);
+        sec.appendChild(row);
+      });
+
       const rEff = parseFloat((BASE_RADIUS * ring.scale * ring.radius).toFixed(2));
       const info = document.createElement('div'); info.className = 'gen-info';
       info.textContent = `radio efectivo: ${rEff} u`;
