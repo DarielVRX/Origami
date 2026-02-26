@@ -24,7 +24,7 @@ let moduleGeom     = null;
 // ── Helpers matemáticos ──
 const clampNumber = (v, mn, mx)      => Math.min(mx, Math.max(mn, v));
 const roundStep   = (v, step)        => Math.round(v / step) * step;
-const maxOriginOffset = (modules, arc) => Math.max(0, Math.round((modules / arc) * 360 * 2));
+const maxOriginOffset = (modules) => modules;  // range [-M, M]
 
 function ensureFixedState(ring) {
   const keys = ['modules', 'arc', 'scale', 'radius'];
@@ -159,7 +159,7 @@ function computeFree(ring) {
 
   ['modules','arc','scale','radius'].forEach(k => { if (ring.fixed[k]) ring[k] = prev[k]; });
 
-  ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules, ring.arc), maxOriginOffset(ring.modules, ring.arc));
+  ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules), maxOriginOffset(ring.modules));
 }
 
 // ── Cargar módulo base ──
@@ -198,12 +198,13 @@ export async function generateStructure() {
   for (const [ringIndex, ring] of rings.entries()) {
     computeFree(ring);
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
-    const scaleFactor = 1 / Math.max(scale, 0.0001);
+    const scaleFactor = scale;  // scale>1 = bigger module
+    const radiusFactor = 1 / Math.max(scale, 0.0001);  // for positioning
     const angleStep       = arc / modules;
     const halfRingArc     = arc / 2;
     const halfStep        = angleStep / 2;
     const originOffset    = -(originModule * halfStep);
-    const vStep           = V_STEP_BASE * scaleFactor;
+    const vStep           = V_STEP_BASE * radiusFactor;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
@@ -226,9 +227,9 @@ export async function generateStructure() {
         const prevColor = paintKey ? previousColors.get(paintKey) : null;
         if (prevColor) mesh.material.color.copy(prevColor);
         mesh.visible = ring.visible !== false;
-        mesh.scale.setScalar(scaleFactor);
+        mesh.scale.setScalar(scaleFactor);  // direct: scale>1 = bigger
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
-        mesh.position.x = BASE_RADIUS * (radius - 1);
+        mesh.position.x = BASE_RADIUS * (radius - 1) * radiusFactor;
 
         pivot.add(mesh);
         generatedGroup.add(pivot);
@@ -420,41 +421,24 @@ export function buildGeneratorPanel() {
   genBtn.textContent = '⚙️';
   document.body.appendChild(genBtn);
 
-  const previewToggleBtn = document.createElement('button');
-  previewToggleBtn.id = 'gen-preview-toggle';
-  previewToggleBtn.textContent = 'Preview';
-  document.body.appendChild(previewToggleBtn);
+  // standalone preview toggle removed
 
   const panel = document.createElement('div'); panel.id = 'gen-panel';
   document.body.appendChild(panel);
 
-  const previewToggle = document.createElement('button');
-  previewToggle.id = 'gen-preview-toggle';
-  previewToggle.textContent = 'Preview';
-  document.body.appendChild(previewToggle);
+  // previewToggle: no longer a separate button, handled inside panel
 
   function enterPreviewMode() {
     document.body.classList.add('gen-preview-active');
-    panel.classList.remove('open');
-    previewToggle.style.display = 'block';
+    // panel stays open in preview mode
     setPaintInteractionsEnabled(false);
     setModelVisibility(false);
-    activateExclusive(null);
-    const fg = document.getElementById('fab-group');
-    const gr = document.getElementById('grid-btn');
-    const gb = document.getElementById('gen-btn');
-    if (fg) fg.style.visibility = 'hidden';
-    if (gr) gr.style.visibility = 'hidden';
-    if (gb) gb.style.visibility = 'hidden';
   }
 
   function exitPreviewMode() {
     document.body.classList.remove('gen-preview-active');
-    previewToggle.style.display = 'none';
     setPaintInteractionsEnabled(true);
     setModelVisibility(true);
-    const gb = document.getElementById('gen-btn');
-    if (gb) gb.style.visibility = _panelIsOpen ? 'hidden' : 'visible';
   }
   _exitPreviewMode = exitPreviewMode;
 
@@ -476,8 +460,53 @@ export function buildGeneratorPanel() {
     const closeX   = document.createElement('button');
     closeX.textContent = '✕';
     closeX.style.cssText = "width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);cursor:pointer;font-size:16px;";
-    closeX.addEventListener('click', closePanel);
-    prevBtn.addEventListener('click',  () => generateStructure().then(enterPreviewMode).catch(e => alert(e.message)));
+    closeX.addEventListener('click', () => {
+      const inPreview = document.body.classList.contains('gen-preview-active');
+      if (inPreview) {
+        // close panel but keep preview state — show only joystick pads
+        panel.classList.remove('open');
+        _panelIsOpen = false;
+        // hide fab/gen, show only pads
+        const fg = document.getElementById('fab-group');
+        const gb = document.getElementById('gen-btn');
+        const gr = document.getElementById('grid-btn');
+        if (fg) fg.style.visibility = 'hidden';
+        if (gb) gb.style.visibility = 'hidden';
+        if (gr) gr.style.visibility = 'hidden';
+        ['orbit','pan','zoom'].forEach(id => {
+          const p = document.getElementById('cam-pad-' + id);
+          if (p) p.style.visibility = 'visible';
+        });
+      } else {
+        closePanel();
+      }
+    });
+    let previewActive = document.body.classList.contains('gen-preview-active');
+    prevBtn.style.borderColor = previewActive ? 'rgba(80,220,120,0.4)' : 'rgba(80,180,255,0.4)';
+    prevBtn.style.background  = previewActive ? 'rgba(80,220,120,0.18)' : 'rgba(80,180,255,0.12)';
+    prevBtn.style.color       = previewActive ? '#6fdc9a' : '#6ab0ff';
+
+    prevBtn.addEventListener('click', () => {
+      if (document.body.classList.contains('gen-preview-active')) {
+        // toggle off preview
+        exitPreviewMode();
+        prevBtn.style.borderColor = 'rgba(80,180,255,0.4)';
+        prevBtn.style.background  = 'rgba(80,180,255,0.12)';
+        prevBtn.style.color       = '#6ab0ff';
+      } else {
+        generateStructure()
+          .then(() => {
+            // toggle on preview: stay in panel, just show green
+            document.body.classList.add('gen-preview-active');
+            setPaintInteractionsEnabled(false);
+            setModelVisibility(false);
+            prevBtn.style.borderColor = 'rgba(80,220,120,0.4)';
+            prevBtn.style.background  = 'rgba(80,220,120,0.18)';
+            prevBtn.style.color       = '#6fdc9a';
+          })
+          .catch(e => alert(e.message));
+      }
+    });
     applyBtn.addEventListener('click', () => applyGenerated().catch(e => alert(e.message)));
     hBtns.append(prevBtn, applyBtn, closeX);
     hdr.append(hTitle, hBtns);
@@ -580,7 +609,7 @@ export function buildGeneratorPanel() {
 
       if (idx > 0) {
         const prev = rings[idx - 1];
-        const sug  = parseFloat((prev.yOffset + prev.layers * V_STEP_BASE * prev.scale).toFixed(2));
+        const sug  = parseFloat((prev.yOffset + prev.layers * V_STEP_BASE / Math.max(prev.scale, 0.0001)).toFixed(2));
         const hint = document.createElement('div'); hint.className = 'gen-hint';
         hint.textContent = `sugerido: ${sug} u  ↵`;
         hint.addEventListener('click', () => { ring.yOffset = sug; renderPanel(); refreshPreviewIfActive(); });
@@ -588,7 +617,7 @@ export function buildGeneratorPanel() {
       }
 
       // Módulo origen
-      const maxO = maxOriginOffset(ring.modules, ring.arc);
+      const maxO = maxOriginOffset(ring.modules);
       const mr = document.createElement('div'); mr.className = 'gen-row';
       mr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Módulo origen' }));
       mr.append(numCtrl(ring.originModule, -maxO, maxO, 1, v => { ring.originModule = v; refreshPreviewIfActive(); }));
@@ -607,7 +636,7 @@ export function buildGeneratorPanel() {
     addRing.addEventListener('click', () => {
       const last = rings[rings.length - 1];
       const nr = defaultRing(); nr.scale = last.scale;
-      nr.yOffset = parseFloat((last.yOffset + last.layers * V_STEP_BASE * last.scale).toFixed(2));
+      nr.yOffset = parseFloat((last.yOffset + last.layers * V_STEP_BASE / Math.max(last.scale, 0.0001)).toFixed(2));
       rings.push(nr); renderPanel(); refreshPreviewIfActive();
     });
     footer.appendChild(addRing);
@@ -619,12 +648,12 @@ export function buildGeneratorPanel() {
     activateExclusive('gen');
     if (generatedGroup && generatedGroup.children.length) {
       document.body.classList.add('gen-preview-active');
-      previewToggle.style.display = 'block';
+  
       setPaintInteractionsEnabled(false);
       setModelVisibility(false);
     } else {
       document.body.classList.remove('gen-preview-active');
-      previewToggle.style.display = 'none';
+  
       setPaintInteractionsEnabled(true);
       setModelVisibility(true);
     }
@@ -641,12 +670,7 @@ export function buildGeneratorPanel() {
     if (gb) gb.style.visibility = _panelIsOpen ? 'hidden' : 'visible';
   };
 
-  previewToggle.addEventListener('click', e => {
-    e.stopPropagation();
-    if (!document.body.classList.contains('gen-preview-active')) return;
-    renderPanel();
-    openPanel();
-  });
+  // previewToggle listener removed
 
   genBtn.addEventListener('click', e => {
     e.stopPropagation();
