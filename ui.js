@@ -725,14 +725,14 @@ export function buildUI({} = {}) {
     return pad;
   };
 
-  createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
-  createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
-  createPad({ id: 'zoom', icon: '🔍', tip: 'Zoom', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'orbit', icon: '↻', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
+  createPad({ id: 'pan', icon: '✥', pos: 'left:24px;bottom:112px;' });
+  createPad({ id: 'zoom', icon: '🔍', pos: 'left:24px;bottom:112px;' });
 
   const camStackBtn = document.createElement('div');
   camStackBtn.className = 'cam-pad cam-stack-toggle';
   camStackBtn.id = 'cam-pad-stack-toggle';
-  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
+  camStackBtn.setAttribute('data-tip',);
   camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
   camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
   document.body.appendChild(camStackBtn);
