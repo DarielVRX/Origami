@@ -27,10 +27,18 @@ const roundStep   = (v, step)        => Math.round(v / step) * step;
 const maxOriginAt360 = (modules, arc) => Math.max(1, Math.round((modules * 2 * arc) / 360));
 
 function ensureFixedState(ring) {
-  const keys  = ['modules', 'arc', 'scale', 'radius'];
+  const keys = ['modules', 'arc', 'scale', 'radius'];
   const fixed = keys.filter(k => ring.fixed[k]);
-  if (fixed.length >= 4) ring.fixed[ring._autoKey] = false;
-  if (fixed.length < 3)  { ring.fixed.modules = true; ring.fixed.arc = true; ring.fixed.scale = true; }
+
+  if (fixed.length > 3) {
+    const keepAuto = ring._autoKey && keys.includes(ring._autoKey) ? ring._autoKey : 'radius';
+    keys.forEach(k => { ring.fixed[k] = k !== keepAuto; });
+  }
+
+  if (keys.every(k => ring.fixed[k])) {
+    ring.fixed[ring._autoKey || 'radius'] = false;
+  }
+
   const auto = keys.find(k => !ring.fixed[k]);
   ring._autoKey = auto || 'radius';
 }
@@ -330,6 +338,11 @@ export function buildGeneratorPanel() {
   genBtn.textContent = '⚙️';
   document.body.appendChild(genBtn);
 
+  const previewToggleBtn = document.createElement('button');
+  previewToggleBtn.id = 'gen-preview-toggle';
+  previewToggleBtn.textContent = 'Preview';
+  document.body.appendChild(previewToggleBtn);
+
   const panel = document.createElement('div'); panel.id = 'gen-panel';
   document.body.appendChild(panel);
 
@@ -369,7 +382,6 @@ export function buildGeneratorPanel() {
     const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
     panel.innerHTML = '';
 
-    // ── Header ──
     const hdr = document.createElement('div');
     hdr.style.cssText = 'padding:36px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
     const hTitle = document.createElement('span');
@@ -388,11 +400,9 @@ export function buildGeneratorPanel() {
     hdr.append(hTitle, hBtns);
     panel.appendChild(hdr);
 
-    // ── Scroll area ──
     const scroll = document.createElement('div'); scroll.id = 'gen-scroll';
     panel.appendChild(scroll);
 
-    // ── Anillos ──
     rings.forEach((ring, idx) => {
       computeFree(ring);
       const sec = document.createElement('div'); sec.className = 'gen-section';
@@ -427,7 +437,6 @@ export function buildGeneratorPanel() {
       }
       sec.appendChild(rh);
 
-      // 4 parámetros
       const defs = [
         { key: 'modules', label: 'Módulos',  min: 1,   max: 500, step: 1   },
         { key: 'arc',     label: 'Arco (°)', min: 1,   max: 360, step: 0.5 },
@@ -447,31 +456,30 @@ export function buildGeneratorPanel() {
         );
         const tog = document.createElement('button');
         tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
-        tog.textContent = ring.fixed[key] ? 'fijo' : 'auto';
+        tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
         tog.addEventListener('click', () => {
-          if (!ring.fixed[key]) return;
-          ring.fixed[ring._autoKey] = false;
-          ring.fixed[key] = true;
-          ring._autoKey = ['modules','arc','scale','radius'].find(k => !ring.fixed[k]) || 'radius';
-          computeFree(ring); renderPanel();
+          const next = !ring.fixed[key];
+          const fixedCount = Object.values(ring.fixed).filter(Boolean).length;
+          if (!next && fixedCount <= 1) return;
+          if (next && fixedCount >= 3) return;
+          ring.fixed[key] = next;
+          computeFree(ring);
+          renderPanel();
         });
         row.append(lbl, tog, ctrl);
         sec.appendChild(row);
       });
 
-      // Radio efectivo
       const rEff = parseFloat((BASE_RADIUS * ring.scale * ring.radius).toFixed(2));
       const info = document.createElement('div'); info.className = 'gen-info';
       info.textContent = `radio efectivo: ${rEff} u`;
       sec.appendChild(info);
 
-      // Capas
       const lr = document.createElement('div'); lr.className = 'gen-row';
       lr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Capas' }));
       lr.append(numCtrl(ring.layers, 1, 200, 1, v => { ring.layers = v; renderPanel(); }));
       sec.appendChild(lr);
 
-      // Offset Y
       const or_ = document.createElement('div'); or_.className = 'gen-row';
       or_.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Offset Y' }));
       or_.append(numCtrl(ring.yOffset, -500, 500, 0.1, v => { ring.yOffset = v; }));
@@ -486,7 +494,6 @@ export function buildGeneratorPanel() {
         sec.appendChild(hint);
       }
 
-      // Módulo origen
       const maxO = maxOriginAt360(ring.modules, ring.arc);
       const mr = document.createElement('div'); mr.className = 'gen-row';
       mr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Módulo origen' }));
@@ -496,13 +503,11 @@ export function buildGeneratorPanel() {
       scroll.appendChild(sec);
     });
 
-    // Restore scroll
     requestAnimationFrame(() => {
       const s = panel.querySelector('#gen-scroll');
       if (s) s.scrollTop = savedScroll;
     });
 
-    // Añadir anillo
     const addRing = document.createElement('div'); addRing.className = 'gen-add-ring';
     addRing.textContent = '+ Añadir anillo';
     addRing.addEventListener('click', () => {
