@@ -165,24 +165,30 @@ function computeFree(ring) {
 
 // Recalcular yOffsets en cascada para rings con yOffsetAuto=true
 function recomputeYOffsets() {
-  // Empezamos desde el segundo anillo (índice 1)
+  const V_STEP_BASE = 2.1; 
+
   for (let i = 1; i < rings.length; i++) {
-    // Si el usuario bloqueó el offset manualmente, saltamos
     if (!rings[i].yOffsetAuto) continue;
 
     const prev = rings[i - 1];
     
-    // 1. Tomamos el offset de inicio del anillo anterior.
-    // 2. Calculamos cuánto miden sus capas: (Número de capas * V_STEP_BASE).
-    // 3. Lo dividimos por su escala (a menor escala, mayor altura visual en el espacio 3D, 
-    //    o viceversa según cómo esté definido tu motor, pero siguiendo tu lógica de "inversamente proporcional").
+    // 1. Calculamos la altura acumulada de las capas del anillo anterior.
+    // Usamos la escala del anterior para determinar cuánto mide cada capa.
+    const layersHeight = (prev.layers * V_STEP_BASE) / Math.max(prev.scale, 0.0001);
+
+    // 2. El "paso final" para posicionar el siguiente anillo.
+    // Según tu requerimiento, este último tramo también debe ser inversamente 
+    // proporcional a esa misma escala del anillo que acaba de terminar.
+    const finalStep = V_STEP_BASE / Math.max(prev.scale, 0.0001);
+
+    // 3. El nuevo offset es la base del anterior + sus capas + el paso proporcional
+    rings[i].yOffset = parseFloat((prev.yOffset + layersHeight).toFixed(2));
     
-    const heightOfPreviousRing = (prev.layers * V_STEP_BASE) / Math.max(prev.scale, 0.0001);
-    
-    // El nuevo offset es el inicio del anterior + la altura total ocupada por el anterior
-    rings[i].yOffset = parseFloat((prev.yOffset + heightOfPreviousRing).toFixed(2));
+    // Si quisieras que el offset fuera un paso MÁS allá de la última capa:
+    // rings[i].yOffset = parseFloat((prev.yOffset + layersHeight + finalStep).toFixed(2));
   }
 }
+
 // ── Cargar módulo base ──
 export async function loadModuleBuffer(url) {
   const res = await fetch(url, { cache: 'no-store' });
