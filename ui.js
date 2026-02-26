@@ -128,7 +128,15 @@ body { overflow:hidden; }
 
 #fab-children.open { max-height:400px; opacity:1; }
 
-
+@media (orientation: landscape) and (max-height: 560px) {
+  #fab-group { flex-direction:row; right:16px; bottom:16px; gap:10px; }
+  #fab-children {
+    flex-direction:row; align-items:center;
+    max-height:none; max-width:0; opacity:0;
+    transition:max-width 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+  }
+  #fab-children.open { max-width:360px; opacity:1; }
+}
 
 .fab[data-tip] { position:relative; }
 
@@ -1225,6 +1233,10 @@ export function buildUI({} = {}) {
     brushPanel.classList.remove('visible');
     closeAll();
   });
+  brushSlider.addEventListener('change', () => {
+    brushPanel.classList.remove('visible');
+    closeAll();
+  });
 
   const brushCircle = document.createElement('div');
 
@@ -1421,8 +1433,6 @@ export function buildUI({} = {}) {
       document.getElementById('fab-group').style.visibility = 'hidden';
 
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
-
-      document.getElementById('grid-btn') && (document.getElementById('grid-btn').style.visibility='hidden');
 
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
   const padEls = {};
@@ -1655,6 +1665,11 @@ export function buildUI({} = {}) {
 }
 #cam-pad-pan.open  { opacity:1; pointer-events:auto; transform:translateY(-88px); }
 #cam-pad-zoom.open { opacity:1; pointer-events:auto; transform:translateY(-168px); }
+
+@media (orientation: landscape) and (max-height: 560px) {
+  #cam-pad-pan.open  { transform:translateX(88px); }
+  #cam-pad-zoom.open { transform:translateX(168px); }
+}
 #fab-lock { display:none; }
 
 

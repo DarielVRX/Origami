@@ -207,7 +207,8 @@ const CSS = `
   transform:translateX(100%); transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
 }
 #gen-panel.open { transform:translateX(0); }
-#gen-scroll { flex:1; overflow-y:auto; padding-bottom:24px; }
+#gen-scroll { flex:1; overflow-y:auto; padding-bottom:12px; }
+#gen-footer { padding:12px 16px 16px; border-top:1px solid rgba(255,255,255,0.06); flex-shrink:0; }
 .gen-section { padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.06); }
 .gen-title {
   font-family:'Courier New',monospace; font-size:11px;
@@ -250,7 +251,7 @@ const CSS = `
 .gen-info { font-family:'Courier New',monospace; font-size:11px; color:rgba(80,180,255,0.6); text-align:right; margin:-2px 0 6px; }
 .gen-hint { font-family:'Courier New',monospace; font-size:11px; color:rgba(255,200,80,0.55); text-align:right; margin:-2px 0 4px; cursor:pointer; }
 .gen-add-ring {
-  margin:12px 16px; padding:12px;
+  margin:0; width:100%; padding:12px;
   background:rgba(255,255,255,0.04); border:1px dashed rgba(255,255,255,0.15);
   border-radius:8px; color:rgba(255,255,255,0.4);
   font-family:'Courier New',monospace; font-size:13px; cursor:pointer;
@@ -402,6 +403,8 @@ export function buildGeneratorPanel() {
 
     const scroll = document.createElement('div'); scroll.id = 'gen-scroll';
     panel.appendChild(scroll);
+    const footer = document.createElement('div'); footer.id = 'gen-footer';
+    panel.appendChild(footer);
 
     rings.forEach((ring, idx) => {
       computeFree(ring);
@@ -516,7 +519,7 @@ export function buildGeneratorPanel() {
       nr.yOffset = parseFloat((last.yOffset + last.layers * V_STEP_BASE * last.scale).toFixed(2));
       rings.push(nr); renderPanel();
     });
-    scroll.appendChild(addRing);
+    footer.appendChild(addRing);
   }
 
   const openPanel  = ()  => {
