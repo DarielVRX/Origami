@@ -600,7 +600,7 @@ export function buildUI({} = {}) {
     brushPanel.classList.remove('visible');
     closeAll();
   });
-  
+
   const brushCircle = document.createElement('div');
   brushCircle.id = 'brush-circle';
   document.body.appendChild(brushCircle);

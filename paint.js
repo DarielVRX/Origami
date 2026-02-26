@@ -14,6 +14,7 @@ export let brushSize        = 1;
 export let eyedropperActive = false;
 export let isDrawing        = false;
 
+const lockedMeshIds = new Set();
 
 export function setCurrentColor(c)     { currentColor     = c; }
 export function setBrushSize(s)        { brushSize        = s; }

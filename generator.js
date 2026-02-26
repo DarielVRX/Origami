@@ -6,6 +6,7 @@ import * as THREE        from 'https://unpkg.com/three@0.163.0/build/three.modul
 import { GLTFLoader }    from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene, resizeGuidePlanes } from './scene.js';
 import { activateExclusive } from './ui.js';
+import { setModelVisibility } from './model.js';
 import { setRingLocked } from './paint.js';
 
 // ── Constantes del modelo original ──
