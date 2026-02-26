@@ -9,7 +9,7 @@ import { doExportGLB, doExportGLBLocal, doExportImage }  from './export.js';
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { camera as _cam, controls as _ctrl }   from './scene.js';
 import {
-  setCurrentColor, setBrushSize, setEyedropperActive,
+  settColor, setBrushSize, setEyedropperActive,
   eyedropperActive
 } from './paint.js';
 
@@ -963,6 +963,7 @@ export function buildUI({} = {}) {
   palettePreviewTimeout = setTimeout(() => {
     if (!paletteDiv.classList.contains('visible-sticky')) {
       palettePopup.classList.remove('visible');
+    setBottomButtonsVisible(true);
     }
   }, 1500);
 };
@@ -980,7 +981,18 @@ export function buildUI({} = {}) {
   document.addEventListener('wheel', e => {
     if (e.target.closest('#gen-panel, #side-menu, #brush-panel, #gen-scroll')) return;
     e.preventDefault();
-    activateExclusive(null);
+document.addEventListener('wheel', e => {
+  if (e.target.closest('#gen-panel, #side-menu, #brush-panel, #gen-scroll')) return;
+
+  e.preventDefault();
+  setBottomButtonsVisible(false);
+  if (fabPalette) fabPalette.style.visibility = 'visible';
+  const dir = e.deltaY > 0 ? 1 : -1;
+  currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
+
+  showPalettePreview(allColors[currentColorIndex]);
+
+}, { passive: false });
     const dir = e.deltaY > 0 ? 1 : -1;
     currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
     showPalettePreview(allColors[currentColorIndex]);
