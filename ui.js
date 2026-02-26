@@ -495,11 +495,7 @@ export function activateExclusive(name) {
 export function closeAll() {
   document.getElementById('side-menu')?.classList.remove('open');
   document.getElementById('brush-panel')?.classList.remove('visible');
-if (!palettePreviewActive) {
   document.getElementById('palette-popup')?.classList.remove('visible');
-  const p = document.getElementById('palette-popup');
-  if (p) p.style.display = 'none';
-}
   document.getElementById('palette-div')?.classList.remove('visible');
   document.getElementById('fab-main')?.classList.remove('open');
   document.getElementById('fab-children')?.classList.remove('open');
@@ -664,8 +660,6 @@ export function buildUI({} = {}) {
   brushCircle.id = 'brush-circle';
   document.body.appendChild(brushCircle);
 
-let palettePreviewActive = false;
-  
   // ── Paleta ──
   const palettePopup = document.createElement('div');
   palettePopup.id = 'palette-popup';
@@ -957,9 +951,10 @@ let palettePreviewActive = false;
   let palettePreviewTimeout = null;
 const showPalettePreview = (color) => {
 
-  palettePreviewActive = true;
+  // ⚠️ NO tocar fab-group
+  // ⚠️ NO tocar otros botones
 
-  palettePopup.style.display = 'flex';
+  palettePopup.classList.add('visible');
   paletteDiv.classList.remove('visible');
 
   currentColorPreview.style.background = color;
@@ -969,8 +964,7 @@ const showPalettePreview = (color) => {
   clearTimeout(palettePreviewTimeout);
   palettePreviewTimeout = setTimeout(() => {
     if (!paletteDiv.classList.contains('visible-sticky')) {
-      palettePopup.style.display = 'none';
-      palettePreviewActive = false;
+      palettePopup.classList.remove('visible');
     }
   }, 1500);
 };
@@ -996,7 +990,11 @@ document.addEventListener('wheel', e => {
   showPalettePreview(allColors[currentColorIndex]);
 
 }, { passive: false });
-  
+    const dir = e.deltaY > 0 ? 1 : -1;
+    currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
+    showPalettePreview(allColors[currentColorIndex]);
+  }, { passive: false });
+
   // ── Middle mouse drag: cambiar tamaño de pincel ──
   let middleActive = false, middleLastY = 0;
   document.addEventListener('mousedown', e => {
