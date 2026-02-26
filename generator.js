@@ -451,8 +451,7 @@ export function buildGeneratorPanel() {
     setModelVisibility(true);
   }
   _exitPreviewMode = exitPreviewMode;
-
-});
+  
   function renderPanel() {
     _renderGeneratorPanel = renderPanel;
     // Point 3: preserve scroll position across re-renders
