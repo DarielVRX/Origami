@@ -24,7 +24,7 @@ let moduleGeom     = null;
 // ── Helpers matemáticos ──
 const clampNumber = (v, mn, mx)      => Math.min(mx, Math.max(mn, v));
 const roundStep   = (v, step)        => Math.round(v / step) * step;
-const maxOriginOffset = (modules) => modules;  // range [-M, M]
+const maxOriginOffset = (modules, arc) => Math.max(1, Math.round(modules * (arc / 360)));  // [-M*arc/360, M*arc/360]
 
 function ensureFixedState(ring) {
   const keys = ['modules', 'arc', 'scale', 'radius'];
@@ -57,6 +57,7 @@ const defaultRing = () => ({
   radius:   1.0,
   layers:   10,
   yOffset:  0,
+  yOffsetAuto: true,   // true = recalcular al cambiar escala del anillo previo
   originModule: 0,
 });
 
@@ -159,7 +160,16 @@ function computeFree(ring) {
 
   ['modules','arc','scale','radius'].forEach(k => { if (ring.fixed[k]) ring[k] = prev[k]; });
 
-  ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules), maxOriginOffset(ring.modules));
+  ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules, ring.arc), maxOriginOffset(ring.modules, ring.arc));
+}
+
+// Recalcular yOffsets en cascada para rings con yOffsetAuto=true
+function recomputeYOffsets() {
+  for (let i = 1; i < rings.length; i++) {
+    if (!rings[i].yOffsetAuto) continue;
+    const prev = rings[i - 1];
+    rings[i].yOffset = parseFloat((prev.yOffset + prev.layers * V_STEP_BASE / Math.max(prev.scale, 0.0001)).toFixed(2));
+  }
 }
 
 // ── Cargar módulo base ──
@@ -463,19 +473,18 @@ export function buildGeneratorPanel() {
     closeX.addEventListener('click', () => {
       const inPreview = document.body.classList.contains('gen-preview-active');
       if (inPreview) {
-        // close panel but keep preview state — show only joystick pads
+        // Cerrar panel pero mantener preview — mostrar gen-btn + pads, ocultar fab/grid
         panel.classList.remove('open');
         _panelIsOpen = false;
-        // hide fab/gen, show only pads
         const fg = document.getElementById('fab-group');
         const gb = document.getElementById('gen-btn');
         const gr = document.getElementById('grid-btn');
         if (fg) fg.style.visibility = 'hidden';
-        if (gb) gb.style.visibility = 'hidden';
         if (gr) gr.style.visibility = 'hidden';
+        if (gb) gb.style.visibility = 'visible';   // gen-btn visible
         ['orbit','pan','zoom'].forEach(id => {
           const p = document.getElementById('cam-pad-' + id);
-          if (p) p.style.visibility = 'visible';
+          if (p) p.style.visibility = 'visible';   // pads visibles
         });
       } else {
         closePanel();
@@ -563,10 +572,34 @@ export function buildGeneratorPanel() {
         const row = document.createElement('div'); row.className = 'gen-row';
         const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
 
+        // Calcular límites dinámicos para el parámetro auto según los fijos
+        if (isAuto) {
+          if (key === 'modules') {
+            min = 1; max = clampNumber(Math.round(K * ring.arc * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
+          } else if (key === 'arc') {
+            const mMax = clampNumber(Math.round(K * 360 * BASE_RADIUS * ring.radius / Math.max(ring.scale, 0.0001)), 1, 500);
+            min = Math.max(1, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)));
+            max = Math.min(360, Math.round(ring.modules * ring.scale / (K * BASE_RADIUS * ring.radius)) * 2 || 360);
+            // Simplificado: recalcular los extremos reales
+            min = clampNumber(roundStep(ring.modules * Math.max(ring.scale, 0.0001) / (K * BASE_RADIUS * Math.max(ring.radius, 0.1)), 0.5), 1, 360);
+            max = 360;
+          } else if (key === 'scale') {
+            min = 0.1; max = 20;
+          } else if (key === 'radius') {
+            min = 0.1; max = 20;
+          }
+        }
+
         const ctrl = numCtrl(
           parseFloat(Number(ring[key]).toFixed(4)),
           min, max, step,
-          v => { ring[key] = v; computeFree(ring); renderPanel(); refreshPreviewIfActive(); },
+          v => {
+            ring[key] = v;
+            computeFree(ring);
+            if (key === 'scale' || key === 'layers') recomputeYOffsets();
+            renderPanel();
+            refreshPreviewIfActive();
+          },
           isAuto
         );
         const tog = document.createElement('button');
@@ -599,12 +632,12 @@ export function buildGeneratorPanel() {
 
       const lr = document.createElement('div'); lr.className = 'gen-row';
       lr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Capas' }));
-      lr.append(numCtrl(ring.layers, 1, 200, 1, v => { ring.layers = v; renderPanel(); refreshPreviewIfActive(); }));
+      lr.append(numCtrl(ring.layers, 1, 200, 1, v => { ring.layers = v; recomputeYOffsets(); renderPanel(); refreshPreviewIfActive(); }));
       sec.appendChild(lr);
 
       const or_ = document.createElement('div'); or_.className = 'gen-row';
       or_.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Offset Y' }));
-      or_.append(numCtrl(ring.yOffset, -500, 500, 0.1, v => { ring.yOffset = v; refreshPreviewIfActive(); }));
+      or_.append(numCtrl(ring.yOffset, -500, 500, 0.1, v => { ring.yOffset = v; ring.yOffsetAuto = false; refreshPreviewIfActive(); }));
       sec.appendChild(or_);
 
       if (idx > 0) {
@@ -612,12 +645,12 @@ export function buildGeneratorPanel() {
         const sug  = parseFloat((prev.yOffset + prev.layers * V_STEP_BASE / Math.max(prev.scale, 0.0001)).toFixed(2));
         const hint = document.createElement('div'); hint.className = 'gen-hint';
         hint.textContent = `sugerido: ${sug} u  ↵`;
-        hint.addEventListener('click', () => { ring.yOffset = sug; renderPanel(); refreshPreviewIfActive(); });
+        hint.addEventListener('click', () => { ring.yOffset = sug; ring.yOffsetAuto = true; renderPanel(); refreshPreviewIfActive(); });
         sec.appendChild(hint);
       }
 
       // Módulo origen
-      const maxO = maxOriginOffset(ring.modules);
+      const maxO = maxOriginOffset(ring.modules, ring.arc);
       const mr = document.createElement('div'); mr.className = 'gen-row';
       mr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Módulo origen' }));
       mr.append(numCtrl(ring.originModule, -maxO, maxO, 1, v => { ring.originModule = v; refreshPreviewIfActive(); }));
@@ -637,6 +670,7 @@ export function buildGeneratorPanel() {
       const last = rings[rings.length - 1];
       const nr = defaultRing(); nr.scale = last.scale;
       nr.yOffset = parseFloat((last.yOffset + last.layers * V_STEP_BASE / Math.max(last.scale, 0.0001)).toFixed(2));
+      nr.yOffsetAuto = true;
       rings.push(nr); renderPanel(); refreshPreviewIfActive();
     });
     footer.appendChild(addRing);
@@ -697,10 +731,6 @@ async function applyGenerated() {
     setRingVisible(idx, ring.visible !== false);
     setRingLocked(idx, ring.visible === false ? true : ring.locked);
   });
-  _exitPreviewMode();
-  if (_panelIsOpen) {
-    const gb = document.getElementById('gen-btn');
-    if (gb) gb.style.visibility = 'hidden';
-  }
+  // NO salir de preview — el usuario sigue viendo la estructura
   generatedGroup = null;
 }
