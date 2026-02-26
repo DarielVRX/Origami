@@ -1445,6 +1445,8 @@ export function buildUI({} = {}) {
     document.body.appendChild(pad);
 
     padEls[id] = pad;
+    return pad;
+  };
 
     return pad;
 
