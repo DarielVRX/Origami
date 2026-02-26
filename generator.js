@@ -382,18 +382,26 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
   const btnM = document.createElement('button'); btnM.textContent = '−';
   const inp  = document.createElement('input');
   inp.type = 'number'; inp.min = min; inp.max = max; inp.step = step; inp.value = value;
-  if (readonly) { inp.readOnly = true; inp.classList.add('computed'); }
+  // Mantener clase visual, pero permitir escritura
+if (readonly) inp.classList.add('computed'); 
   const btnP = document.createElement('button'); btnP.textContent = '+';
   btnM.disabled = readonly;
   btnP.disabled = readonly;
 
-  const apply = v => {
+const stepArc = 0.5; // paso definido por tu fórmula
+const stepRadius = 0.1; // paso definido por tu fórmula
+
+const apply = v => {
     const parsed = parseFloat(v);
     const base = Number.isFinite(parsed) ? parsed : parseFloat(inp.value);
+    
+    // redondea solo al step correspondiente
+    const step = key === 'arc' ? stepArc : (key === 'radius' ? stepRadius : step);
     const c = clampNumber(roundStep(base, step), min, max);
+    
     inp.value = parseFloat(c.toFixed(10));
     if (!readonly) onChange(c);
-  };
+};
 
   let holdTimer = null;
   let holdInterval = null;
