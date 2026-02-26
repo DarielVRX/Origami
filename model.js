@@ -149,10 +149,18 @@ export function adoptGeneratedGroup(group) {
     uuidToMesh.set(child.uuid, child);
   });
 
-  const center = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3());
-  controls.target.copy(center);
   controls.update();
-  resetCamera();
   resizeGuidePlanes(group);
   onLoadCallbacks.forEach(cb => cb(group));
+}
+
+export function setModelVisibility(visible) {
+  if (!glbModel) return;
+  glbModel.visible = visible;
+}
+
+
+// Alias defensivo para evitar errores por diferencias de mayúsculas/minúsculas
+export function setmodelvisibility(visible) {
+  setModelVisibility(visible);
 }
