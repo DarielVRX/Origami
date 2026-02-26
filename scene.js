@@ -59,17 +59,20 @@ scene.add(new THREE.AxesHelper(5));
 
 // ── Planos guía (ocultos por defecto, toggle vía evento) ──
 const GUIDE_SIZE = 400;
-const guideMat = new THREE.MeshBasicMaterial({
-  color: 0x4488ff, transparent: true, opacity: 0.015,
+const guideMatZ = new THREE.MeshBasicMaterial({
+  color: 0x00ff00, transparent: true, opacity: 0.25,
   side: THREE.DoubleSide, depthWrite: false
 });
-const planeXY = new THREE.Mesh(new THREE.PlaneGeometry(GUIDE_SIZE, GUIDE_SIZE), guideMat.clone());
-planeXY.visible = false;  // normal Z — guía eje Z
+const guideMatX = new THREE.MeshBasicMaterial({
+  color: 0xff0000, transparent: true, opacity: 0.25,
+  side: THREE.DoubleSide, depthWrite: false
+});
+const planeXY = new THREE.Mesh(new THREE.PlaneGeometry(GUIDE_SIZE, GUIDE_SIZE), guideMatZ);
+planeXY.visible = false;  // normal Z — guía eje Z (verde)
 
-const planeYZ = new THREE.Mesh(new THREE.PlaneGeometry(GUIDE_SIZE, GUIDE_SIZE), guideMat.clone());
-planeYZ.rotation.y = Math.PI / 2;  // normal X — guía eje X
+const planeYZ = new THREE.Mesh(new THREE.PlaneGeometry(GUIDE_SIZE, GUIDE_SIZE), guideMatX);
+planeYZ.rotation.y = Math.PI / 2;  // normal X — guía eje X (rojo)
 planeYZ.visible = false;
-
 scene.add(planeXY);
 scene.add(planeYZ);
 
