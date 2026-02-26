@@ -161,9 +161,3 @@ export function setModelVisibility(visible) {
   if (!glbModel) return;
   glbModel.visible = visible;
 }
-
-
-// Alias defensivo para evitar errores por diferencias de mayúsculas/minúsculas
-export function setmodelvisibility(visible) {
-  setModelVisibility(visible);
-}

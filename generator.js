@@ -6,7 +6,8 @@ import * as THREE        from 'https://unpkg.com/three@0.163.0/build/three.modul
 import { GLTFLoader }    from 'https://unpkg.com/three@0.163.0/examples/jsm/loaders/GLTFLoader.js?module';
 import { scene, resizeGuidePlanes } from './scene.js';
 import { activateExclusive } from './ui.js';
-import { setRingLocked, setRingVisible } from './paint.js';
+import { setModelVisibility } from './model.js';
+import { setRingLocked } from './paint.js';
 
 // ── Constantes del modelo original ──
 const K              = 20 / (360 * 17);   // módulos / (arc * BASE_RADIUS * scale * radius)
@@ -26,10 +27,18 @@ const roundStep   = (v, step)        => Math.round(v / step) * step;
 const maxOriginAt360 = (modules, arc) => Math.max(1, Math.round((modules * 2 * arc) / 360));
 
 function ensureFixedState(ring) {
-  const keys  = ['modules', 'arc', 'scale', 'radius'];
+  const keys = ['modules', 'arc', 'scale', 'radius'];
   const fixed = keys.filter(k => ring.fixed[k]);
-  if (fixed.length >= 4) ring.fixed[ring._autoKey] = false;
-  if (fixed.length < 3)  { ring.fixed.modules = true; ring.fixed.arc = true; ring.fixed.scale = true; }
+
+  if (fixed.length > 3) {
+    const keepAuto = ring._autoKey && keys.includes(ring._autoKey) ? ring._autoKey : 'radius';
+    keys.forEach(k => { ring.fixed[k] = k !== keepAuto; });
+  }
+
+  if (keys.every(k => ring.fixed[k])) {
+    ring.fixed[ring._autoKey || 'radius'] = false;
+  }
+
   const auto = keys.find(k => !ring.fixed[k]);
   ring._autoKey = auto || 'radius';
 }
@@ -39,7 +48,6 @@ const defaultRing = () => ({
   id: Date.now(),
   fixed:    { modules: false, arc: true, scale: true, radius: true },
   locked:   false,
-  visible:  true,
   _autoKey: 'modules',
   modules:  20,
   arc:      360,
@@ -101,7 +109,7 @@ export async function generateStructure() {
   generatedGroup = new THREE.Group();
   const geometry = await getModuleGeometry();
 
-  for (const [ringIndex, ring] of rings.entries()) {
+  for (const [idx, ring] of rings.entries()) {
     computeFree(ring);
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
     const effectiveRadius = BASE_RADIUS * scale * radius;
@@ -123,8 +131,7 @@ export async function generateStructure() {
         pivot.position.y = y;
 
         const mesh = new THREE.Mesh(geometry, mat.clone());
-        mesh.userData.ringId = `ring:${ringIndex}`;
-        mesh.visible = ring.visible !== false;
+        mesh.userData.ringId = `ring:${idx}`;
         mesh.scale.setScalar(scale);
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
         mesh.position.x = BASE_RADIUS * (radius - 1);
@@ -222,6 +229,19 @@ const CSS = `
   border:1px solid rgba(80,180,255,0.4); background:rgba(80,180,255,0.12); color:#6ab0ff; transition:background 0.15s;
 }
 .gen-preview:hover { background:rgba(80,180,255,0.25); }
+.gen-close {
+  width:34px; height:34px; border-radius:8px; cursor:pointer;
+  font-family:'Courier New',monospace; font-size:16px;
+  border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.08);
+  color:rgba(255,255,255,0.75); display:flex; align-items:center; justify-content:center;
+}
+.gen-close:hover { background:rgba(255,255,255,0.18); }
+#gen-preview-toggle {
+  position:fixed; top:24px; right:24px; z-index:2001;
+  padding:9px 16px; border-radius:8px; display:none;
+  font-family:'Courier New',monospace; font-size:12px; letter-spacing:1px; text-transform:uppercase;
+  border:1px solid rgba(80,180,255,0.45); background:rgba(80,180,255,0.2); color:#6ab0ff; cursor:pointer;
+}
 `;
 
 // ── Helper: control numérico +/- ──
@@ -261,30 +281,49 @@ export function buildGeneratorPanel() {
   genBtn.textContent = '⚙️';
   document.body.appendChild(genBtn);
 
+  const previewToggleBtn = document.createElement('button');
+  previewToggleBtn.id = 'gen-preview-toggle';
+  previewToggleBtn.textContent = 'Preview';
+  document.body.appendChild(previewToggleBtn);
+
   const panel = document.createElement('div'); panel.id = 'gen-panel';
   document.body.appendChild(panel);
 
-  function enterPreviewMode() {
-    document.body.classList.add('gen-preview-active');
+  let previewMode = false;
+
+  function exitPreview({ showGenerator = true } = {}) {
+    if (!previewMode) return;
+    previewMode = false;
+    previewToggleBtn.style.display = 'none';
+    setModelVisibility(true);
+    if (!showGenerator) {
+      activateExclusive(null);
+      return;
+    }
+    panel.classList.add('open');
+    genBtn.style.display = 'none';
+    activateExclusive('gen');
+  }
+
+  async function enterPreview() {
+    await generateStructure();
+    previewMode = true;
+    setModelVisibility(false);
     panel.classList.remove('open');
-    activateExclusive(null);
+    genBtn.style.display = 'none';
+    previewToggleBtn.style.display = 'block';
+    activateExclusive(null); // muestra cámara
     const fg = document.getElementById('fab-group');
     const gr = document.getElementById('grid-btn');
     if (fg) fg.style.visibility = 'hidden';
     if (gr) gr.style.visibility = 'hidden';
   }
 
-  function exitPreviewMode() {
-    document.body.classList.remove('gen-preview-active');
-  }
-
   function renderPanel() {
-    // Point 3: preserve scroll position across re-renders
     const scrollEl = panel.querySelector('#gen-scroll');
     const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
     panel.innerHTML = '';
 
-    // ── Header ──
     const hdr = document.createElement('div');
     hdr.style.cssText = 'padding:36px 16px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;';
     const hTitle = document.createElement('span');
@@ -294,20 +333,17 @@ export function buildGeneratorPanel() {
     const prevBtn  = document.createElement('button'); prevBtn.className  = 'gen-preview'; prevBtn.textContent = '▶';
     const applyBtn = document.createElement('button'); applyBtn.className = 'gen-apply';   applyBtn.textContent = '✓';
     const closeX   = document.createElement('button');
-    closeX.textContent = '✕';
-    closeX.style.cssText = "width:34px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.75);cursor:pointer;font-size:16px;";
+    closeX.className = 'gen-close'; closeX.textContent = '✕';
     closeX.addEventListener('click', closePanel);
-    prevBtn.addEventListener('click',  () => generateStructure().then(enterPreviewMode).catch(e => alert(e.message)));
+    prevBtn.addEventListener('click',  () => enterPreview().catch(e => alert(e.message)));
     applyBtn.addEventListener('click', () => applyGenerated(closePanel));
     hBtns.append(prevBtn, applyBtn, closeX);
     hdr.append(hTitle, hBtns);
     panel.appendChild(hdr);
 
-    // ── Scroll area ──
     const scroll = document.createElement('div'); scroll.id = 'gen-scroll';
     panel.appendChild(scroll);
 
-    // ── Anillos ──
     rings.forEach((ring, idx) => {
       computeFree(ring);
       const sec = document.createElement('div'); sec.className = 'gen-section';
@@ -315,26 +351,15 @@ export function buildGeneratorPanel() {
       const rh = document.createElement('div'); rh.className = 'ring-header';
       const rt = document.createElement('div'); rt.className = 'gen-title'; rt.style.marginBottom = '0';
       rt.textContent = `Anillo ${idx + 1}`;
-      const ringCtrls = document.createElement('div'); ringCtrls.style.cssText = 'display:flex;gap:6px;align-items:center;';
       const lockBtn = document.createElement('button');
       lockBtn.className = 'fix-btn' + (ring.locked ? ' active' : '');
-      lockBtn.textContent = ring.locked ? 'bloq' : 'pintable';
+      lockBtn.textContent = ring.locked ? 'bloqueado' : 'pintable';
       lockBtn.addEventListener('click', () => {
         ring.locked = !ring.locked;
-        if (ring.visible !== false) setRingLocked(idx, ring.locked);
+        setRingLocked(idx, ring.locked);
         renderPanel();
       });
-      const visBtn = document.createElement('button');
-      visBtn.className = 'fix-btn' + (ring.visible === false ? '' : ' active');
-      visBtn.textContent = ring.visible === false ? 'oculto' : 'visible';
-      visBtn.addEventListener('click', () => {
-        ring.visible = !ring.visible;
-        setRingVisible(idx, ring.visible);
-        setRingLocked(idx, ring.visible ? ring.locked : true);
-        renderPanel();
-      });
-      ringCtrls.append(lockBtn, visBtn);
-      rh.append(rt, ringCtrls);
+      rh.append(rt, lockBtn);
       if (rings.length > 1) {
         const del = document.createElement('button'); del.className = 'ring-del'; del.textContent = '✕';
         del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); });
@@ -342,7 +367,6 @@ export function buildGeneratorPanel() {
       }
       sec.appendChild(rh);
 
-      // 4 parámetros
       const defs = [
         { key: 'modules', label: 'Módulos',  min: 1,   max: 500, step: 1   },
         { key: 'arc',     label: 'Arco (°)', min: 1,   max: 360, step: 0.5 },
@@ -362,31 +386,30 @@ export function buildGeneratorPanel() {
         );
         const tog = document.createElement('button');
         tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
-        tog.textContent = ring.fixed[key] ? 'fijo' : 'auto';
+        tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
         tog.addEventListener('click', () => {
-          if (!ring.fixed[key]) return;
-          ring.fixed[ring._autoKey] = false;
-          ring.fixed[key] = true;
-          ring._autoKey = ['modules','arc','scale','radius'].find(k => !ring.fixed[k]) || 'radius';
-          computeFree(ring); renderPanel();
+          const next = !ring.fixed[key];
+          const fixedCount = Object.values(ring.fixed).filter(Boolean).length;
+          if (!next && fixedCount <= 1) return;
+          if (next && fixedCount >= 3) return;
+          ring.fixed[key] = next;
+          computeFree(ring);
+          renderPanel();
         });
         row.append(lbl, tog, ctrl);
         sec.appendChild(row);
       });
 
-      // Radio efectivo
       const rEff = parseFloat((BASE_RADIUS * ring.scale * ring.radius).toFixed(2));
       const info = document.createElement('div'); info.className = 'gen-info';
       info.textContent = `radio efectivo: ${rEff} u`;
       sec.appendChild(info);
 
-      // Capas
       const lr = document.createElement('div'); lr.className = 'gen-row';
       lr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Capas' }));
       lr.append(numCtrl(ring.layers, 1, 200, 1, v => { ring.layers = v; renderPanel(); }));
       sec.appendChild(lr);
 
-      // Offset Y
       const or_ = document.createElement('div'); or_.className = 'gen-row';
       or_.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Offset Y' }));
       or_.append(numCtrl(ring.yOffset, -500, 500, 0.1, v => { ring.yOffset = v; }));
@@ -401,7 +424,6 @@ export function buildGeneratorPanel() {
         sec.appendChild(hint);
       }
 
-      // Módulo origen
       const maxO = maxOriginAt360(ring.modules, ring.arc);
       const mr = document.createElement('div'); mr.className = 'gen-row';
       mr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Módulo origen' }));
@@ -411,13 +433,11 @@ export function buildGeneratorPanel() {
       scroll.appendChild(sec);
     });
 
-    // Restore scroll
     requestAnimationFrame(() => {
       const s = panel.querySelector('#gen-scroll');
       if (s) s.scrollTop = savedScroll;
     });
 
-    // Añadir anillo
     const addRing = document.createElement('div'); addRing.className = 'gen-add-ring';
     addRing.textContent = '+ Añadir anillo';
     addRing.addEventListener('click', () => {
@@ -430,20 +450,33 @@ export function buildGeneratorPanel() {
   }
 
   const openPanel  = ()  => {
-    exitPreviewMode();
+    exitPreview();
     panel.classList.add('open');
+    genBtn.style.display = 'none';
     activateExclusive('gen');
-    const gb = document.getElementById('gen-btn');
-    if (gb) gb.style.visibility = 'hidden';
   };
   const closePanel = ()  => {
-    exitPreviewMode();
+    exitPreview({ showGenerator: false });
     panel.classList.remove('open');
     disposeGeneratedGroup();
+    setModelVisibility(true);
+    genBtn.style.display = 'flex';
+    previewToggleBtn.style.display = 'none';
     activateExclusive(null);
-    const gb = document.getElementById('gen-btn');
-    if (gb) gb.style.visibility = 'visible';
   };
+
+  previewToggleBtn.addEventListener('click', () => {
+    if (!previewMode) return;
+    setModelVisibility(true);
+    previewToggleBtn.style.display = 'none';
+    panel.classList.add('open');
+    activateExclusive('gen');
+    const fg = document.getElementById('fab-group');
+    const gr = document.getElementById('grid-btn');
+    if (fg) fg.style.visibility = 'hidden';
+    if (gr) gr.style.visibility = 'hidden';
+    previewMode = false;
+  });
 
   genBtn.addEventListener('click', e => {
     e.stopPropagation();
@@ -466,11 +499,7 @@ function applyGenerated(closeFn) {
     alert('Genera una vista previa primero.'); return;
   }
   if (_onApply) _onApply(generatedGroup);
-  rings.forEach((ring, idx) => {
-    setRingVisible(idx, ring.visible !== false);
-    setRingLocked(idx, ring.visible === false ? true : ring.locked);
-  });
-  document.body.classList.remove('gen-preview-active');
+  rings.forEach((ring, idx) => setRingLocked(idx, !!ring.locked));
   generatedGroup = null;
   closeFn();
 }
