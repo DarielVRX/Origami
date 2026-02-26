@@ -905,9 +905,7 @@ export function setBottomButtonsVisible(visible) {
   const gb = document.getElementById('gen-btn');
 
   const gr = document.getElementById('grid-btn');
-
   ['orbit','pan','zoom','stack-toggle'].forEach(id => {
-
     const p = document.getElementById(`cam-pad-${id}`);
 
     if (p) p.style.visibility = v;
@@ -933,9 +931,7 @@ export function activateExclusive(name) {
   const gb = document.getElementById('gen-btn');
 
   const gr = document.getElementById('grid-btn');
-
   ['orbit','pan','zoom','stack-toggle'].forEach(id => {
-
     const p = document.getElementById(`cam-pad-${id}`);
 
     if (p) p.style.visibility = (name === null ? 'visible' : 'hidden');
@@ -967,11 +963,22 @@ export function closeAll() {
   document.getElementById('fab-main')?.classList.remove('open');
 
   document.getElementById('fab-children')?.classList.remove('open');
-
-  // Restaurar todos los botones
-
-  activateExclusive(null);
-
+  const inPreview = document.body.classList.contains('gen-preview-active');
+  if (inPreview) {
+    ['orbit','pan','zoom','stack-toggle'].forEach(id => {
+      const p = document.getElementById(`cam-pad-${id}`);
+      if (p) p.style.visibility = 'visible';
+    });
+    const fg = document.getElementById('fab-group');
+    const gr = document.getElementById('grid-btn');
+    const gb = document.getElementById('gen-btn');
+    if (fg) fg.style.visibility = 'hidden';
+    if (gr) gr.style.visibility = 'hidden';
+    if (gb) gb.style.visibility = 'visible';
+  } else {
+    // Restaurar todos los botones
+    activateExclusive(null);
+  }
   if (typeof _resetFabOpen === 'function') _resetFabOpen();
 
   _closeAllHooks.forEach(fn => fn());
@@ -1155,18 +1162,11 @@ export function buildUI({} = {}) {
     else         activateExclusive(null);
 
   };
-
   fabMain.addEventListener('click', e => {
-
     e.stopPropagation();
-
     if (fabOpen) closeAll();
-
     else { closeAll(); toggleFab(); }
-
   });
-
-
 
   // ── Panel pincel ──
 
@@ -1209,8 +1209,10 @@ export function buildUI({} = {}) {
     closeAll();
 
   });
-
-
+  brushSlider.addEventListener('change', () => {
+    brushPanel.classList.remove('visible');
+    closeAll();
+  });
 
   const brushCircle = document.createElement('div');
 
@@ -1345,9 +1347,7 @@ export function buildUI({} = {}) {
       // 9 — ocultar todo menos el contenido activo
 
       activateExclusive(null); // restaurar primero, luego ocultar
-
       ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
-
       document.getElementById('fab-group').style.visibility = 'hidden';
 
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
@@ -1375,9 +1375,7 @@ export function buildUI({} = {}) {
       brushPanel.classList.add('visible');
 
       // 9
-
       ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
-
       document.getElementById('fab-group').style.visibility = 'hidden';
 
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
@@ -1407,9 +1405,7 @@ export function buildUI({} = {}) {
       paletteDiv.classList.add('visible');
 
       // 9
-
       ['orbit','pan','zoom','stack-toggle'].forEach(id => { const p = document.getElementById(`cam-pad-${id}`); if(p) p.style.visibility='hidden'; });
-
       document.getElementById('fab-group').style.visibility = 'hidden';
 
       document.getElementById('gen-btn')  && (document.getElementById('gen-btn').style.visibility='hidden');
@@ -1422,16 +1418,10 @@ export function buildUI({} = {}) {
 
   });
 
-
-
   // ── Controles de cámara: orbitar fijo + panel desplegable pan/zoom ──
-
   const padEls = {};
 
-
-
   const createPad = ({ id, icon, tip, pos, fontSize = '26px' }) => {
-
     const pad = document.createElement('div');
 
     pad.className = 'cam-pad'; pad.id = `cam-pad-${id}`;
@@ -1439,86 +1429,16 @@ export function buildUI({} = {}) {
     pad.setAttribute('data-tip', tip);
 
     pad.style.cssText = `position:fixed;${pos}z-index:2000;`;
-
     const iconEl = document.createElement('span');
     iconEl.style.fontSize = fontSize;
     iconEl.style.fontStyle = 'normal';
     iconEl.textContent = icon;
     pad.appendChild(iconEl);
-
     document.body.appendChild(pad);
 
     padEls[id] = pad;
     return pad;
   };
-
-    return pad;
-
-  };
-
-
-
-  createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
-
-  createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
-
-  createPad({ id: 'zoom', icon: '🔍', tip: 'Zoom', pos: 'left:24px;bottom:112px;' });
-
-
-
-  const camStackBtn = document.createElement('div');
-
-  camStackBtn.className = 'cam-pad cam-stack-toggle';
-
-  camStackBtn.id = 'cam-pad-stack-toggle';
-
-  camStackBtn.setAttribute('data-tip', 'Pan + Zoom');
-
-  camStackBtn.style.cssText = 'position:fixed;left:24px;bottom:112px;z-index:2000;';
-
-  camStackBtn.innerHTML = '<span style="font-size:20px;">▲</span>';
-
-  document.body.appendChild(camStackBtn);
-
-
-
-  let camStackOpen = false;
-
-  const applyCamStack = () => {
-
-    const pan = padEls.pan;
-
-    const zoom = padEls.zoom;
-
-    if (!pan || !zoom) return;
-
-    pan.classList.toggle('open', camStackOpen);
-
-    zoom.classList.toggle('open', camStackOpen);
-
-    camStackBtn.classList.toggle('open', camStackOpen);
-
-    camStackBtn.querySelector('span').textContent = camStackOpen ? '▼' : '▲';
-
-  };
-
-  applyCamStack();
-
-  camStackBtn.addEventListener('click', e => {
-
-    e.stopPropagation();
-
-    camStackOpen = !camStackOpen;
-
-    applyCamStack();
-
-  });
-
-
-
-  ['orbit', 'pan', 'zoom'].forEach(id => {
-
-    const pad = padEls[id];
 
   createPad({ id: 'orbit', icon: '↻', tip: 'Orbitar', pos: 'left:24px;bottom:24px;', fontSize: '34px' });
   createPad({ id: 'pan', icon: '✥', tip: 'Pan', pos: 'left:24px;bottom:112px;' });
@@ -1560,7 +1480,6 @@ export function buildUI({} = {}) {
       if (active) return;
 
       active = true; lastX = x; lastY = y;
-
       const fg = document.getElementById('fab-group');
 
       const gb = document.getElementById('gen-btn');
@@ -1580,28 +1499,17 @@ export function buildUI({} = {}) {
       if (!active) return;
 
       active = false;
-
       const inPreview = document.body.classList.contains('gen-preview-active');
-
       const fg = document.getElementById('fab-group');
 
       const gb = document.getElementById('gen-btn');
 
       const gr = document.getElementById('grid-btn');
-
       if (inPreview) {
-
         if (fg) fg.style.visibility = 'hidden';
-
         if (gr) gr.style.visibility = 'hidden';
-
-
-        if (gb) gb.style.visibility = 'visible';
-
         return;
-
       }
-
       if (fg) fg.style.visibility = 'visible';
 
       if (gb) gb.style.visibility = 'visible';
@@ -1663,7 +1571,6 @@ export function buildUI({} = {}) {
         const dir = _cam.position.clone().sub(_ctrl.target).normalize();
 
         const dist = _cam.position.distanceTo(_ctrl.target);
-
         const nd  = Math.max(1, dist + dy * 0.5);
 
         _cam.position.copy(_ctrl.target).addScaledVector(dir, nd);
@@ -1739,21 +1646,13 @@ export function buildUI({} = {}) {
 }
 
 .cam-pad[data-tip]:hover::after { opacity:1; }
-
 .cam-stack-toggle { width:54px; height:54px; font-size:18px; }
-
 #cam-pad-pan, #cam-pad-zoom {
-
   width:66px; height:66px; opacity:0; pointer-events:none;
-
   transition:transform 0.22s ease, opacity 0.22s ease;
-
 }
-
 #cam-pad-pan.open  { opacity:1; pointer-events:auto; transform:translateY(-88px); }
-
 #cam-pad-zoom.open { opacity:1; pointer-events:auto; transform:translateY(-168px); }
-
 #fab-lock { display:none; }
 
 
