@@ -175,7 +175,6 @@ function computeFree(ring) {
   const prev = { modules: ring.modules, arc: ring.arc, scale: ring.scale, radius: ring.radius };
   
   // ... resto de la lógica de asignación
-}
   if (ring._autoKey === 'modules') ring.modules = calcModules(ring.arc, ring.scale, ring.radius);
   else if (ring._autoKey === 'arc') ring.arc = calcArc(ring.modules, ring.scale, ring.radius);
   else if (ring._autoKey === 'scale') ring.scale = calcScale(ring.modules, ring.arc, ring.radius);
