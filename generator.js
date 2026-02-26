@@ -613,11 +613,6 @@ export function buildGeneratorPanel() {
     const row = document.createElement('div'); row.className = 'gen-row';
     const lbl = document.createElement('span'); lbl.className = 'gen-label'; lbl.textContent = label;
 
-    // Aquí continuarías con la creación de los inputs (input.min = min, input.max = max, etc.)
-    // ...
-  });
-});
-
         // Calcular límites dinámicos para el parámetro auto según los fijos
         if (isAuto) {
           if (key === 'modules') {
