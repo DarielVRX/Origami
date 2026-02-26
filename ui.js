@@ -263,7 +263,7 @@ function makeInput(placeholder = '', value = '') {
 // ─────────────────────────────────────────────────────────────
 // MODAL — Nombre de archivo (export)
 // ─────────────────────────────────────────────────────────────
-export function askFilename(defaultName, onConfirm) {
+export function askFilename(defaultName, onConfirm, { checkGithub = true } = {}) {
   const overlay = makeOverlay();
   const box     = makeBox();
 
@@ -289,7 +289,12 @@ export function askFilename(defaultName, onConfirm) {
   const checkExists = () => {
     clearTimeout(checkTimeout);
     const name = input.value.trim();
-    if (!name) { warning.style.display = 'none'; return; }
+    if (!checkGithub || !name) {
+      warning.style.display = 'none';
+      input.style.borderColor = 'rgba(255,255,255,0.2)';
+      confirm.textContent = 'Guardar';
+      return;
+    }
     checkTimeout = setTimeout(async () => {
       const exists = await checkFileExists(name).catch(() => false);
       warning.style.display    = exists ? 'block' : 'none';
@@ -297,7 +302,7 @@ export function askFilename(defaultName, onConfirm) {
       confirm.textContent      = exists ? 'Sobreescribir' : 'Guardar';
     }, 400);
   };
-  input.addEventListener('input', checkExists);
+  if (checkGithub) input.addEventListener('input', checkExists);
 
   const close = () => overlay.remove();
   cancel.addEventListener('click', close);
@@ -559,7 +564,7 @@ export function buildUI({} = {}) {
 
   addLabel('Exportar');
   addMenuBtn('🖼️', 'Exportar Imagen 2×2',   () => { closeAll(); askFilename('collage_2x2', doExportImage); });
-  addMenuBtn('💾', 'Exportar GLB local',     () => { closeAll(); askFilename('ModeloGLB', name => doExportGLBLocal(name)); });
+  addMenuBtn('💾', 'Exportar GLB local',     () => { closeAll(); askFilename('ModeloGLB', name => doExportGLBLocal(name), { checkGithub:false }); });
   addMenuBtn('📦', 'Exportar GLB → GitHub', () => { closeAll(); askFilename('ModeloGLB', name => doExportGLB(name)); });
 
   // ── FAB group ──
@@ -824,8 +829,8 @@ export function buildUI({} = {}) {
         const tgt = _ctrl.target.clone();
         const off = _cam.position.clone().sub(tgt);
         sph.setFromVector3(off);
-        sph.theta -= dx * 0.03;
-        sph.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi + dy * 0.03));
+        sph.theta += dx * 0.03;
+        sph.phi    = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi - dy * 0.03));
         off.setFromSpherical(sph);
         _cam.position.copy(tgt).add(off);
         _cam.lookAt(tgt);

@@ -7,7 +7,7 @@ import { GLTFLoader }    from 'https://unpkg.com/three@0.163.0/examples/jsm/load
 import { scene, resizeGuidePlanes } from './scene.js';
 import { activateExclusive } from './ui.js';
 import { setRingLocked, setRingVisible, setPaintInteractionsEnabled } from './paint.js';
-import { setModelVisibility } from './model.js';
+import { setModelVisibility, glbModel } from './model.js';
 
 // ── Constantes del modelo original ──
 const K              = 20 / (360 * 17);   // módulos / (arc * BASE_RADIUS * scale * radius)
@@ -24,7 +24,7 @@ let moduleGeom     = null;
 // ── Helpers matemáticos ──
 const clampNumber = (v, mn, mx)      => Math.min(mx, Math.max(mn, v));
 const roundStep   = (v, step)        => Math.round(v / step) * step;
-const maxOriginAt360 = (modules, arc) => Math.max(1, Math.round((modules * 2 * arc) / 360));
+const maxOriginOffset = (modules, arc) => Math.max(0, Math.round((modules / arc) * 360));
 
 function ensureFixedState(ring) {
   const keys = ['modules', 'arc', 'scale', 'radius'];
@@ -56,12 +56,44 @@ const defaultRing = () => ({
   radius:   1.0,
   layers:   10,
   yOffset:  0,
-  originModule: 1,
+  originModule: 0,
 });
 
 let rings = [defaultRing()];
 let _renderGeneratorPanel = null;
 let _exitPreviewMode = () => {};
+let _panelIsOpen = false;
+
+function buildPaintKey(mesh) {
+  const r = mesh?.userData?.ringId;
+  const l = mesh?.userData?.ringLayer;
+  const m = mesh?.userData?.ringModule;
+  if (r == null || l == null || m == null) return null;
+  return `${r}|${l}|${m}`;
+}
+
+function captureCurrentColorsByKey() {
+  const map = new Map();
+  if (!glbModel) return map;
+  glbModel.traverse(c => {
+    if (!c.isMesh) return;
+    const key = buildPaintKey(c);
+    if (!key || !c.material?.color) return;
+    map.set(key, c.material.color.clone());
+  });
+  return map;
+}
+
+let _previewRefreshToken = 0;
+let _previewRefreshInFlight = Promise.resolve();
+function refreshPreviewIfActive() {
+  if (!document.body.classList.contains('gen-preview-active')) return;
+  const token = ++_previewRefreshToken;
+  _previewRefreshInFlight = _previewRefreshInFlight
+    .then(() => generateStructure())
+    .then(() => { if (token !== _previewRefreshToken) return generateStructure(); })
+    .catch(err => console.warn('Preview update failed:', err?.message || err));
+}
 
 
 export function getGeneratorRingsSnapshot() {
@@ -114,7 +146,7 @@ function computeFree(ring) {
   } else {
     ring.radius = clampNumber(roundStep(modules / (K * arc * BASE_RADIUS * scale), 0.1), 0.1, 20);
   }
-  ring.originModule = clampNumber(ring.originModule, 1, maxOriginAt360(ring.modules, ring.arc));
+  ring.originModule = clampNumber(ring.originModule, -maxOriginOffset(ring.modules, ring.arc), maxOriginOffset(ring.modules, ring.arc));
 }
 
 // ── Cargar módulo base ──
@@ -145,6 +177,7 @@ function disposeGeneratedGroup() {
 
 // ── Generar estructura ──
 export async function generateStructure() {
+  const previousColors = captureCurrentColorsByKey();
   disposeGeneratedGroup();
   generatedGroup = new THREE.Group();
   const geometry = await getModuleGeometry();
@@ -154,7 +187,9 @@ export async function generateStructure() {
     const { modules, arc, scale, radius, layers, yOffset, originModule } = ring;
     const effectiveRadius = BASE_RADIUS * scale * radius;
     const angleStep       = arc / modules;
-    const originOffset    = -((originModule - 1) * angleStep);
+    const halfRingArc     = arc / 2;
+    const halfStep        = angleStep / 2;
+    const originOffset    = -(originModule * angleStep);
     const vStep           = V_STEP_BASE * scale;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
@@ -163,7 +198,7 @@ export async function generateStructure() {
       const y       = yOffset + layer * vStep;
 
       for (let m = 0; m < modules; m++) {
-        const angleDeg = m * angleStep + stagger + originOffset;
+        const angleDeg = -halfRingArc + halfStep + m * angleStep + stagger + originOffset;
         const angleRad = THREE.MathUtils.degToRad(angleDeg);
 
         const pivot = new THREE.Object3D();
@@ -172,6 +207,11 @@ export async function generateStructure() {
 
         const mesh = new THREE.Mesh(geometry, mat.clone());
         mesh.userData.ringId = `ring:${ringIndex}`;
+        mesh.userData.ringLayer = layer;
+        mesh.userData.ringModule = m;
+        const paintKey = buildPaintKey(mesh);
+        const prevColor = paintKey ? previousColors.get(paintKey) : null;
+        if (prevColor) mesh.material.color.copy(prevColor);
         mesh.visible = ring.visible !== false;
         mesh.scale.setScalar(scale);
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
@@ -391,7 +431,7 @@ export function buildGeneratorPanel() {
     setPaintInteractionsEnabled(true);
     setModelVisibility(true);
     const gb = document.getElementById('gen-btn');
-    if (gb) gb.style.visibility = 'visible';
+    if (gb) gb.style.visibility = _panelIsOpen ? 'hidden' : 'visible';
   }
   _exitPreviewMode = exitPreviewMode;
 
@@ -448,13 +488,14 @@ export function buildGeneratorPanel() {
         ring.visible = !ring.visible;
         setRingVisible(idx, ring.visible);
         setRingLocked(idx, ring.visible ? ring.locked : true);
+        refreshPreviewIfActive();
         renderPanel();
       });
       ringCtrls.append(lockBtn, visBtn);
       rh.append(rt, ringCtrls);
       if (rings.length > 1) {
         const del = document.createElement('button'); del.className = 'ring-del'; del.textContent = '✕';
-        del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); });
+        del.addEventListener('click', () => { rings.splice(idx, 1); renderPanel(); refreshPreviewIfActive(); });
         rh.appendChild(del);
       }
       sec.appendChild(rh);
@@ -473,20 +514,18 @@ export function buildGeneratorPanel() {
         const ctrl = numCtrl(
           parseFloat(Number(ring[key]).toFixed(4)),
           min, max, step,
-          v => { ring[key] = v; computeFree(ring); renderPanel(); },
+          v => { ring[key] = v; computeFree(ring); renderPanel(); refreshPreviewIfActive(); },
           isAuto
         );
         const tog = document.createElement('button');
         tog.className = 'fix-btn' + (ring.fixed[key] ? ' active' : '');
         tog.textContent = ring.fixed[key] ? 'activo' : 'auto';
         tog.addEventListener('click', () => {
-          const next = !ring.fixed[key];
-          const fixedCount = Object.values(ring.fixed).filter(Boolean).length;
-          if (!next && fixedCount <= 1) return;
-          if (next && fixedCount >= 3) return;
-          ring.fixed[key] = next;
-          computeFree(ring);
-          renderPanel();
+          if (!ring.fixed[key]) return;
+          ring.fixed[ring._autoKey] = false;
+          ring.fixed[key] = true;
+          ring._autoKey = ['modules','arc','scale','radius'].find(k => !ring.fixed[k]) || 'radius';
+          computeFree(ring); renderPanel(); refreshPreviewIfActive();
         });
         row.append(lbl, tog, ctrl);
         sec.appendChild(row);
@@ -499,12 +538,12 @@ export function buildGeneratorPanel() {
 
       const lr = document.createElement('div'); lr.className = 'gen-row';
       lr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Capas' }));
-      lr.append(numCtrl(ring.layers, 1, 200, 1, v => { ring.layers = v; renderPanel(); }));
+      lr.append(numCtrl(ring.layers, 1, 200, 1, v => { ring.layers = v; renderPanel(); refreshPreviewIfActive(); }));
       sec.appendChild(lr);
 
       const or_ = document.createElement('div'); or_.className = 'gen-row';
       or_.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Offset Y' }));
-      or_.append(numCtrl(ring.yOffset, -500, 500, 0.1, v => { ring.yOffset = v; }));
+      or_.append(numCtrl(ring.yOffset, -500, 500, 0.1, v => { ring.yOffset = v; refreshPreviewIfActive(); }));
       sec.appendChild(or_);
 
       if (idx > 0) {
@@ -512,14 +551,15 @@ export function buildGeneratorPanel() {
         const sug  = parseFloat((prev.yOffset + prev.layers * V_STEP_BASE * prev.scale).toFixed(2));
         const hint = document.createElement('div'); hint.className = 'gen-hint';
         hint.textContent = `sugerido: ${sug} u  ↵`;
-        hint.addEventListener('click', () => { ring.yOffset = sug; renderPanel(); });
+        hint.addEventListener('click', () => { ring.yOffset = sug; renderPanel(); refreshPreviewIfActive(); });
         sec.appendChild(hint);
       }
 
-      const maxO = maxOriginAt360(ring.modules, ring.arc);
+      // Módulo origen
+      const maxO = maxOriginOffset(ring.modules, ring.arc);
       const mr = document.createElement('div'); mr.className = 'gen-row';
       mr.append(Object.assign(document.createElement('span'), { className:'gen-label', textContent:'Módulo origen' }));
-      mr.append(numCtrl(ring.originModule, 1, maxO, 1, v => { ring.originModule = v; }));
+      mr.append(numCtrl(ring.originModule, -maxO, maxO, 1, v => { ring.originModule = v; refreshPreviewIfActive(); }));
       sec.appendChild(mr);
 
       scroll.appendChild(sec);
@@ -536,12 +576,13 @@ export function buildGeneratorPanel() {
       const last = rings[rings.length - 1];
       const nr = defaultRing(); nr.scale = last.scale;
       nr.yOffset = parseFloat((last.yOffset + last.layers * V_STEP_BASE * last.scale).toFixed(2));
-      rings.push(nr); renderPanel();
+      rings.push(nr); renderPanel(); refreshPreviewIfActive();
     });
     footer.appendChild(addRing);
   }
 
   const openPanel  = ()  => {
+    _panelIsOpen = true;
     exitPreviewMode();
     panel.classList.add('open');
     activateExclusive('gen');
@@ -549,12 +590,13 @@ export function buildGeneratorPanel() {
     if (gb) gb.style.visibility = 'hidden';
   };
   const closePanel = ()  => {
+    _panelIsOpen = false;
     exitPreviewMode();
     panel.classList.remove('open');
     disposeGeneratedGroup();
     activateExclusive(null);
     const gb = document.getElementById('gen-btn');
-    if (gb) gb.style.visibility = 'visible';
+    if (gb) gb.style.visibility = _panelIsOpen ? 'hidden' : 'visible';
   };
 
   previewToggle.addEventListener('click', e => {
@@ -591,5 +633,9 @@ async function applyGenerated() {
     setRingLocked(idx, ring.visible === false ? true : ring.locked);
   });
   _exitPreviewMode();
+  if (_panelIsOpen) {
+    const gb = document.getElementById('gen-btn');
+    if (gb) gb.style.visibility = 'hidden';
+  }
   generatedGroup = null;
 }
