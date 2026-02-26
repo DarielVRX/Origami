@@ -241,7 +241,7 @@ const CSS = `
 #gen-btn:hover  { background:rgba(50,50,50,0.95); transform:scale(1.07); }
 #gen-btn:active { transform:scale(0.95); }
 #gen-panel {
-  position:fixed; top:0; right:0; width:360px; height:100vh;
+  position:fixed; top:0; right:0; width:360px; height:100vh; height:100dvh;
   background:rgba(18,18,18,0.97); backdrop-filter:blur(14px);
   border-left:1px solid rgba(255,255,255,0.08);
   z-index:1900; display:flex; flex-direction:column;
@@ -249,7 +249,17 @@ const CSS = `
 }
 #gen-panel.open { transform:translateX(0); }
 #gen-scroll { flex:1; overflow-y:auto; padding-bottom:12px; }
-#gen-footer { padding:12px 16px 16px; border-top:1px solid rgba(255,255,255,0.06); flex-shrink:0; }
+#gen-footer {
+  position:sticky; bottom:0; z-index:2;
+  padding:12px 16px calc(16px + env(safe-area-inset-bottom));
+  border-top:1px solid rgba(255,255,255,0.06);
+  background:rgba(18,18,18,0.98);
+  flex-shrink:0;
+}
+@media (max-width: 768px) {
+  #gen-panel { width:100vw; }
+  #gen-scroll { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+}
 .gen-section { padding:14px 16px; border-bottom:1px solid rgba(255,255,255,0.06); }
 .gen-title {
   font-family:'Courier New',monospace; font-size:11px;
