@@ -778,6 +778,7 @@ export function buildUI({} = {}) {
       if (inPreview) {
         if (fg) fg.style.visibility = 'hidden';
         if (gr) gr.style.visibility = 'hidden';
+        if (gb) gb.style.visibility = 'visible';
         return;
       }
       if (fg) fg.style.visibility = 'visible';
