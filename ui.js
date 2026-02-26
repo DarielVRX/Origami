@@ -990,11 +990,7 @@ document.addEventListener('wheel', e => {
   showPalettePreview(allColors[currentColorIndex]);
 
 }, { passive: false });
-    const dir = e.deltaY > 0 ? 1 : -1;
-    currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
-    showPalettePreview(allColors[currentColorIndex]);
-  }, { passive: false });
-
+  
   // ── Middle mouse drag: cambiar tamaño de pincel ──
   let middleActive = false, middleLastY = 0;
   document.addEventListener('mousedown', e => {
