@@ -321,25 +321,13 @@ export function buildGeneratorPanel() {
       font-family:'Courier New',monospace; font-size:13px; cursor:pointer; text-align:center;
     }
 
-    .gen-footer {
-      padding:12px 16px calc(12px + env(safe-area-inset-bottom));
-      display:flex; gap:10px;
-      border-top:1px solid rgba(255,255,255,0.06);
-      background:rgba(18,18,18,0.98);
-      position:sticky;
-      bottom:0;
-      z-index:1;
-    }
     .gen-action {
-      flex:1; padding:12px; border-radius:8px; cursor:pointer;
-      font-family:'Courier New',monospace; font-size:13px; letter-spacing:1px;
+      padding:8px 10px; border-radius:8px; cursor:pointer;
+      font-family:'Courier New',monospace; font-size:12px; letter-spacing:1px;
       text-transform:uppercase; border:1px solid;
     }
     .gen-apply {
       background:rgba(200,120,255,0.12); border-color:rgba(200,120,255,0.4); color:#c97fff;
-    }
-    .gen-export {
-      background:rgba(80,200,120,0.12); border-color:rgba(80,200,120,0.4); color:#6fdc9a;
     }
   </style>`);
 
@@ -359,11 +347,21 @@ export function buildGeneratorPanel() {
     const header = document.createElement('div');
     header.style.cssText = 'padding:40px 16px 8px; display:flex; align-items:center; justify-content:space-between;';
     header.innerHTML = `<span style="font-family:'Courier New',monospace;font-size:13px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.5);">Generador</span>`;
+    const headerActions = document.createElement('div');
+    headerActions.style.cssText = 'display:flex; align-items:center; gap:8px;';
+    const applyBtn = document.createElement('button');
+    applyBtn.className = 'gen-action gen-apply';
+    applyBtn.textContent = '✓ Aplicar';
+    applyBtn.addEventListener('click', async () => {
+      await generateStructure().catch(e => alert(`Error: ${e.message}`));
+      applyGenerated(closePanel);
+    });
     const closeBtn = document.createElement('div');
     closeBtn.textContent = '✕';
     closeBtn.style.cssText = 'color:rgba(255,255,255,0.3);cursor:pointer;font-size:18px;padding:4px 8px;';
     closeBtn.addEventListener('click', closePanel);
-    header.appendChild(closeBtn);
+    headerActions.append(applyBtn, closeBtn);
+    header.appendChild(headerActions);
     panel.appendChild(header);
 
     const scroll = document.createElement('div');
@@ -513,23 +511,6 @@ export function buildGeneratorPanel() {
     });
     scroll.appendChild(addRing);
 
-    const footer = document.createElement('div');
-    footer.className = 'gen-footer';
-    const applyBtn = document.createElement('button');
-    applyBtn.className = 'gen-action gen-apply';
-    applyBtn.textContent = '✓ Aplicar';
-    const expBtn = document.createElement('button');
-    expBtn.className = 'gen-action gen-export';
-    expBtn.textContent = '↓ GLB';
-
-    applyBtn.addEventListener('click', async () => {
-      await generateStructure().catch(e => alert(`Error: ${e.message}`));
-      applyGenerated(closePanel);
-    });
-    expBtn.addEventListener('click', exportGenerated);
-
-    footer.append(applyBtn, expBtn);
-    panel.appendChild(footer);
   }
 
   function openPanel() { panel.classList.add('open'); }
