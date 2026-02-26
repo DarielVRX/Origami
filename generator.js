@@ -301,25 +301,42 @@ function numCtrl(value, min, max, step, onChange, readonly = false) {
 
   let holdTimer = null;
   let holdInterval = null;
+  let removeGlobalHoldStop = null;
   const clearHold = () => {
     if (holdTimer) clearTimeout(holdTimer);
     if (holdInterval) clearInterval(holdInterval);
-    holdTimer = null; holdInterval = null;
+    if (typeof removeGlobalHoldStop === 'function') removeGlobalHoldStop();
+    holdTimer = null;
+    holdInterval = null;
+    removeGlobalHoldStop = null;
   };
-  const startHold = dir => {
+  const startHold = (event, dir) => {
     if (readonly) return;
+    if (event.button !== undefined && event.button !== 0) return;
+    clearHold();
     const tick = mult => apply((parseFloat(inp.value) || 0) + (dir * step * mult));
     tick(1);
     let mult = 1;
     holdInterval = setInterval(() => tick(mult), 120);
     holdTimer = setTimeout(() => { mult = 5; }, 3000);
+
+    const stop = () => clearHold();
+    const opts = { capture: true };
+    window.addEventListener('pointerup', stop, opts);
+    window.addEventListener('pointercancel', stop, opts);
+    window.addEventListener('blur', stop);
+    removeGlobalHoldStop = () => {
+      window.removeEventListener('pointerup', stop, opts);
+      window.removeEventListener('pointercancel', stop, opts);
+      window.removeEventListener('blur', stop);
+    };
   };
 
   inp.addEventListener('change', () => apply(inp.value));
   btnM.addEventListener('click', e => e.preventDefault());
   btnP.addEventListener('click', e => e.preventDefault());
-  btnM.addEventListener('pointerdown', () => startHold(-1));
-  btnP.addEventListener('pointerdown', () => startHold(1));
+  btnM.addEventListener('pointerdown', e => startHold(e, -1));
+  btnP.addEventListener('pointerdown', e => startHold(e, 1));
   ['pointerup','pointerleave','pointercancel'].forEach(ev => {
     btnM.addEventListener(ev, clearHold);
     btnP.addEventListener(ev, clearHold);
@@ -573,5 +590,6 @@ async function applyGenerated() {
     setRingVisible(idx, ring.visible !== false);
     setRingLocked(idx, ring.visible === false ? true : ring.locked);
   });
+  _exitPreviewMode();
   generatedGroup = null;
 }
