@@ -901,7 +901,7 @@ function showPreviewToast() {
         const fwd   = _cam.getWorldDirection(new THREE.Vector3());
         const right = new THREE.Vector3().crossVectors(fwd, _cam.up).normalize();
         const up    = new THREE.Vector3().crossVectors(right, fwd).normalize();
-        const spd   = 0.08;
+        const spd   = 0.2;
         _cam.position.addScaledVector(right, -dx * spd);
         _cam.position.addScaledVector(up,     dy * spd);
         _ctrl.target.addScaledVector(right,  -dx * spd);
