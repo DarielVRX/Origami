@@ -250,7 +250,7 @@ export async function generateStructure() {
         mesh.visible = ring.visible !== false;
         mesh.scale.setScalar(scaleFactor);  // direct: scale>1 = bigger
         // Desacoplar radio adicional sobre BASE_RADIUS*scale
-        mesh.position.x = BASE_RADIUS * (radius - 1) * radiusFactor;
+        mesh.position.x = (BASE_RADIUS * (radius - 1));
 
         pivot.add(mesh);
         generatedGroup.add(pivot);
