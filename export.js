@@ -6,6 +6,7 @@
 import * as THREE from 'https://unpkg.com/three@0.163.0/build/three.module.js?module';
 import { scene, camera, renderer, controls } from './scene.js';
 import { uploadToGitHub } from './github.js';
+import { getGeneratorRingsSnapshot } from './generator.js';
 
 // Referencias al estado global inyectadas desde main.js
 let _glbModel        = null;
@@ -64,6 +65,11 @@ export function buildPatchedGLB() {
   const gltf = JSON.parse(
     new TextDecoder().decode(new Uint8Array(buf, jsonDataStart, jsonChunkLen))
   );
+
+  const ringSnapshot = getGeneratorRingsSnapshot();
+  gltf.asset = gltf.asset || { version: '2.0' };
+  gltf.asset.extras = gltf.asset.extras || {};
+  gltf.asset.extras.origamiGenerator = { rings: ringSnapshot };
 
   // Chunk BIN
   let binLength = 0;
