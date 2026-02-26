@@ -173,7 +173,7 @@ function recomputeYOffsets() {
     const prev = rings[i - 1];
     
     // Calculamos el tamaño del paso basado en la escala del anillo anterior
-    const stepSizePrev = V_STEP_BASE / Math.max(prev.scale, 0.0001);
+    const stepSizePrev = V_STEP_BASE * Math.max(prev.scale, 0.0001);
 
     // El nuevo offset es:
     // El inicio del anterior + (todas sus capas + el hueco final) * tamaño del paso
