@@ -214,7 +214,7 @@ export async function generateStructure() {
     const halfRingArc     = arc / 2;
     const halfStep        = angleStep / 2;
     const originOffset    = -(originModule * halfStep);
-    const vStep           = V_STEP_BASE * radiusFactor;
+    const vStep           = V_STEP_BASE / radiusFactor;
     const mat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.8, metalness: 0 });
 
     for (let layer = 0; layer < layers; layer++) {
