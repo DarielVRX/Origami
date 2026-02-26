@@ -50,7 +50,9 @@ onModelLoad(() => {
 onGeneratorApply(group => {
   adoptGeneratedGroup(group);
   import('./model.js').then(m => setExportRefs(m.glbModel, m.originalGLBBuffer));
-  activateExclusive(null);
+  const panelOpen = genPanel.classList.contains('open');
+  const inPreview = document.body.classList.contains('gen-preview-active');
+  if (!panelOpen && !inPreview) activateExclusive(null);
 });
 
 // ── Cargar módulo base para el generador ──
