@@ -980,6 +980,7 @@ export function buildUI({} = {}) {
   document.addEventListener('wheel', e => {
     if (e.target.closest('#gen-panel, #side-menu, #brush-panel, #gen-scroll')) return;
     e.preventDefault();
+    activateExclusive(null);
     const dir = e.deltaY > 0 ? 1 : -1;
     currentColorIndex = (currentColorIndex + dir + allColors.length) % allColors.length;
     showPalettePreview(allColors[currentColorIndex]);
